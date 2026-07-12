@@ -551,25 +551,32 @@ function changeState(cs, x)
     fadeImg.BackgroundTransparency = 1
     print("[DDLC] Game state - chapter: " .. ch .. ", cl: " .. cl)
   elseif cs == "title" then
-    state = "title"; alpha = 0; timer = 0
+    state = "title"; alpha = 255; timer = 0
     textboxBg.Visible = false; nameboxFrm.Visible = false
     diaTxt.Visible = false; nameTxt.Visible = false
     fadeLayer.Visible = true; fadeImg.Visible = true
-    fadeImg.BackgroundTransparency = 1
-    local id = loadImg("images/bg/splash.jpg")
+    fadeImg.BackgroundTransparency = 0
+    -- Title uses menu background
+    local id = loadImg("images/gui/menu_bg.jpg")
     if id then
       bgImg.Image = id
       bgImg.Visible = true; bgLayer.Visible = true
     else
-      bgImg.Visible = false; bgLayer.Visible = true
+      -- fallback to splash
+      local id2 = loadImg("images/bg/splash.jpg")
+      if id2 then
+        bgImg.Image = id2
+        bgImg.Visible = true; bgLayer.Visible = true
+      else
+        bgImg.Visible = false; bgLayer.Visible = true
+      end
     end
   elseif cs == "splash" then
     state = "splash"; alpha = 255; timer = 0
-    bgLayer.Visible = true; bgImg.Visible = false
+    bgLayer.Visible = true; bgImg.Visible = true
     local id = loadImg("images/bg/splash.jpg")
     if id then
       bgImg.Image = id
-      bgImg.Visible = true
     end
     textboxBg.Visible = false; nameboxFrm.Visible = false
     diaTxt.Visible = false; nameTxt.Visible = false
@@ -950,6 +957,12 @@ function env.start()
       end
     elseif state == "title" then
       timer = timer + delta
+      if timer < 2 then
+        alpha = math.max(alpha - 5 * delta * 60, 0)
+        fadeImg.BackgroundTransparency = alpha / 255
+      elseif timer > 5 then
+        changeState("game", 1)
+      end
     elseif state == "game" then
       xaload = xaload + 1
       if xaload > 2 then
