@@ -240,10 +240,10 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = gui
 
--- Main container: 1280x720 centered
+-- Main container: 1280x720 centered (TRANSPARENT - don't cover layers!)
 local mainFrm = Instance.new("Frame")
 mainFrm.Name = "Main"
-mainFrm.BackgroundColor3 = Color3.new(0,0,0)
+mainFrm.BackgroundTransparency = 1
 mainFrm.BorderSizePixel = 0
 mainFrm.Size = UDim2.fromOffset(1280, 720)
 mainFrm.Position = UDim2.fromScale(0.5, 0.5)
@@ -297,7 +297,7 @@ function newFrm(name, pos, size, color, parent)
   return f
 end
 
--- Layers (ordered back to front with explicit ZIndex)
+-- Layers (ordered back to front with explicit ZIndex on the frames)
 local bgLayer = newFrm("BgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.fromRGB(30, 15, 40), mainFrm)
 bgLayer.Visible = true; bgLayer.ZIndex = 1
 local bgImg = newImg("BgImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), bgLayer)
@@ -321,7 +321,6 @@ menuLayer.ZIndex = 7
 local fadeImg = newImg("FadeImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), fadeLayer)
 fadeImg.BackgroundColor3 = Color3.new(0,0,0)
 fadeImg.BackgroundTransparency = 0
-fadeImg.ZIndex = 6
 
 -- Textbox elements (1280x720 coordinate space)
 local textboxBg = newFrm("TextBoxBg", UDim2.fromOffset(0, 560), UDim2.fromOffset(1280, 160), Color3.new(0,0,0), uiLayer)
@@ -918,7 +917,8 @@ end
 -- ========== MAIN LOOP ==========
 local conn; running = false
 function env.start()
-  if running then return end
+  -- Cleanup any previous state
+  env.stop()
   running = true
   print("[DDLC] Starting...")
   
@@ -984,8 +984,16 @@ end
 function env.stop()
   running = false
   if conn then conn:Disconnect() end
+  -- Clean up all DDLC GUIs
+  for _, gui in pairs(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
+    if gui.Name:match("^DDLC") or gui.Name == "AssetLoader" then
+      gui:Destroy()
+    end
+  end
   if screenGui then screenGui:Destroy() end
   bgmSound:Stop()
+  sfxSound:Stop()
+  running = false
 end
 
 print("DDLC-LOVE loaded! Run: ddlc.start()")
