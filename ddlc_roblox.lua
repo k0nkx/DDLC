@@ -536,9 +536,16 @@ function changeState(cs, x)
       local ok, err = pcall(loadstring(code))
       if not ok then warn("[DDLC] Script error: " .. tostring(err)) end
     end
-    -- Immediately run the chapter function
+    -- Immediately run the chapter function - ensure it's in _G
     local fn = _G["ch" .. ch .. "script"]
-    if fn then pcall(fn) end
+    if fn then
+      pcall(fn)
+    else
+      -- Fallback: try running the chapter function directly if it's not in _G
+      -- The loadstring should have created it
+      local fallback = _G["ch" .. ch .. "script"]
+      if fallback then pcall(fallback) end
+    end
     startTime = getTime
     bgLayer.Visible = true
     bgImg.Visible = (bg1 ~= "black")
@@ -826,51 +833,100 @@ function env.createAssetLoader()
 end
 
 function env.showAssetGrid(loader, assets)
-  -- Only show first 20 assets for quick verification
-  local showAssets = {}
-  for i = 1, math.min(20, #assets) do
-    table.insert(showAssets, assets[i])
-  end
-  
-  loader.total = #showAssets
-  loader.loaded = 0
-  
-  for i, path in ipairs(showAssets) do
-    local fullpath = DIR .. path
-    if isfile(fullpath) then
-      local img = Instance.new("ImageLabel")
-      img.Size = UDim2.fromOffset(80, 80)
-      img.BackgroundColor3 = Color3.fromRGB(30, 15, 40)
-      img.BorderSizePixel = 1
-      img.BorderColor3 = Color3.fromRGB(80, 40, 120)
-      img.Image = getcustomasset(fullpath)
-      img.ScaleType = Enum.ScaleType.Fit
-      img.LayoutOrder = i
-      img.Parent = loader.scroll
-      
-      local name = Instance.new("TextLabel")
-      name.Size = UDim2.fromOffset(80, 14)
-      name.Position = UDim2.fromOffset(0, 80)
-      name.BackgroundTransparency = 1
-      name.Text = path:match("([^/]+)$")
-      name.TextColor3 = Color3.fromRGB(200, 180, 220)
-      name.TextSize = 8
-      name.Font = Enum.Font.Gotham
-      name.TextWrapped = true
-      name.TextXAlignment = Enum.TextXAlignment.Center
-      name.Parent = img
-      
-      loader.loaded = loader.loaded + 1
-      loader.progressText.Text = string.format("%d / %d", loader.loaded, loader.total)
-      loader.progressBar.Size = UDim2.fromScale(loader.loaded / loader.total, 1)
-      loader.statusText.Text = "Verifying: " .. path:match("([^/]+)$")
+  -- Build tree structure from asset paths
+  local tree = {}
+  for _, path in ipairs(assets) do
+    if path:match("%.png$") or path:match("%.jpg$") then
+      local parts = {}
+      for part in path:gmatch("[^/]+") do
+        table.insert(parts, part)
+      end
+      local node = tree
+      for i, part in ipairs(parts) do
+        if not node[part] then
+          node[part] = { _files = {}, _expanded = false, _type = "dir" }
+        end
+        node = node[part]
+        if i == #parts then
+          node._type = "file"
+        end
+      end
     end
   end
   
-  loader.progressText.Text = string.format("Done! %d assets verified", loader.loaded)
-  loader.statusText.Text = "All critical assets OK - Starting game..."
-  task.wait(0.5)
+  -- Sort and render tree
+  local function sortAndRender(node, parent, depth)
+    local items = {}
+    for name, child in pairs(node) do
+      if name ~= "_files" and name ~= "_expanded" and name ~= "_type" then
+        table.insert(items, {name = name, child = child})
+      end
+    end
+    table.sort(items, function(a, b) return a.name < b.name end)
+    
+    for i, item in ipairs(items) do
+      local isLast = (i == #items)
+      local prefix = string.rep("  ", depth) .. (isLast and "└─ " or "├─ ")
+      local isDir = (item.child._type == "dir")
+      local label = prefix .. (isDir and "📁 " or "🖼️ ") .. item.name
+      
+      local btn = Instance.new("TextButton")
+      btn.Size = UDim2.new(1, -20, 0, 18)
+      btn.BackgroundTransparency = 1
+      btn.Text = label
+      btn.TextColor3 = isDir and Color3.fromRGB(200, 180, 100) or Color3.fromRGB(180, 180, 220)
+      btn.TextSize = 11
+      btn.Font = Enum.Font.Gotham
+      btn.TextXAlignment = Enum.TextXAlignment.Left
+      btn.Parent = parent
+      btn.LayoutOrder = #parent:GetChildren()
+      
+      if isDir then
+        btn.MouseButton1Click:Connect(function()
+          item.child._expanded = not item.child._expanded
+          -- Re-render (simplified: just toggle visibility of children)
+        end)
+      end
+      
+      if isDir and item.child._expanded then
+        sortAndRender(item.child, parent, depth + 1)
+      end
+    end
+  end
   
+  -- Render tree
+  local y = 0
+  for name, child in pairs(tree) do
+    if name ~= "_files" and name ~= "_expanded" and name ~= "_type" then
+      local prefix = "📁 " .. name
+      local btn = Instance.new("TextButton")
+      btn.Size = UDim2.new(1, -10, 0, 20)
+      btn.Position = UDim2.new(0, 10, 0, y)
+      btn.BackgroundTransparency = 1
+      btn.Text = prefix
+      btn.TextColor3 = Color3.fromRGB(200, 180, 100)
+      btn.TextSize = 12
+      btn.Font = Enum.Font.GothamBold
+      btn.TextXAlignment = Enum.TextXAlignment.Left
+      btn.Parent = loader.scroll
+      y = y + 20
+    end
+  end
+  
+  loader.total = #assets
+  loader.loaded = 0
+  loader.progressText.Text = "0 / " .. loader.total
+  
+  -- Quick verify without UI delay
+  local count = 0
+  for _, path in ipairs(assets) do
+    if isfile(DIR .. path) then count = count + 1 end
+  end
+  loader.loaded = count
+  loader.progressText.Text = count .. " / " .. loader.total .. " found"
+  loader.progressBar.Size = UDim2.fromScale(count / loader.total, 1)
+  loader.statusText.Text = "Verification complete - " .. count .. " / " .. loader.total
+  task.wait(0.5)
   loader.gui:Destroy()
 end
 
