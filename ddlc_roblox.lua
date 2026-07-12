@@ -2,8 +2,7 @@
 -- Uses Sound, ImageLabel, TextLabel, Frame for rendering
 -- Full DDLC-LOVE story via scripts loaded from GitHub
 
-getgenv().ddlc = {}
-local env = getgenv().ddlc
+local env = {}\ngetgenv().ddlc = env
 local BASE = "https://raw.githubusercontent.com/k0nkx/DDLC/main/"
 local DIR = "DDLC/"
 
@@ -964,6 +963,7 @@ function env.stop()
 end
 
 print("DDLC-LOVE loaded! Run: ddlc.start()")
+
 
 
 
