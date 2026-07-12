@@ -631,6 +631,125 @@ function env.verifyCriticalAssets()
   return true
 end
 
+-- ========== ASSET VIEWER (Visual Verification) ==========
+function env.viewAllAssets()
+  print("[DDLC] Loading asset viewer...")
+  changeState("game")
+  bgUpdate("black")
+  bgImg.Visible = true
+  bgLayer.Visible = true
+  
+  local viewerGui = Instance.new("ScreenGui")
+  viewerGui.Name = "AssetViewer"
+  viewerGui.ResetOnSpawn = false
+  viewerGui.IgnoreGuiInset = true
+  viewerGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+  
+  local scroll = Instance.new("ScrollingFrame")
+  scroll.Size = UDim2.fromScale(1, 1)
+  scroll.CanvasSize = UDim2.fromScale(0, 2)
+  scroll.ScrollBarThickness = 8
+  scroll.BackgroundColor3 = Color3.fromRGB(20, 10, 30)
+  scroll.Parent = viewerGui
+  
+  local layout = Instance.new("UIGridLayout")
+  layout.CellSize = UDim2.fromOffset(200, 200)
+  layout.CellPadding = UDim2.fromOffset(10, 10)
+  layout.SortOrder = Enum.SortOrder.LayoutOrder
+  layout.Parent = scroll
+  
+  local label = Instance.new("TextLabel")
+  label.Size = UDim2.fromOffset(1200, 40)
+  label.Position = UDim2.fromOffset(40, 10)
+  label.BackgroundTransparency = 1
+  label.Text = "ASSET VERIFICATION - All images loaded from DDLC folder"
+  label.TextColor3 = Color3.new(1, 1, 1)
+  label.TextSize = 24
+  label.Font = Enum.Font.GothamBold
+  label.TextXAlignment = Enum.TextXAlignment.Left
+  label.Parent = scroll
+  
+  local y = 60
+  local categories = {
+    {"Backgrounds", "images/bg"},
+    {"Characters", "images/sayori", "images/natsuki", "images/yuri", "images/monika"},
+    {"CGs", "images/cg"},
+    {"GUI", "images/gui"},
+    {"Poem Specials", "images/poem_special"},
+  }
+  
+  for _, cat in ipairs(categories) do
+    local catLabel = Instance.new("TextLabel")
+    catLabel.Size = UDim2.fromOffset(1200, 30)
+    catLabel.Position = UDim2.fromOffset(40, y)
+    catLabel.BackgroundTransparency = 1
+    catLabel.Text = "=== " .. cat[1] .. " ==="
+    catLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    catLabel.TextSize = 18
+    catLabel.Font = Enum.Font.GothamBold
+    catLabel.TextXAlignment = Enum.TextXAlignment.Left
+    catLabel.Parent = scroll
+    y = y + 35
+    
+    for i = 2, #cat do
+      local path = cat[i]
+      if isfile(DIR .. "assets/" .. path) then
+        for file in path:gmatch("[^/]+$") do end
+        local files = {}
+        -- Get all files in this directory
+        for _, url in ipairs(asset_urls) do
+          if url:sub(1, #path) == path and (url:match("%.png$") or url:match("%.jpg$")) then
+            table.insert(files, url)
+          end
+        end
+        
+        for _, f in ipairs(files) do
+          local fullpath = DIR .. f
+          if isfile(fullpath) then
+            local img = Instance.new("ImageLabel")
+            img.Size = UDim2.fromOffset(180, 180)
+            img.BackgroundColor3 = Color3.fromRGB(40, 20, 50)
+            img.BorderSizePixel = 2
+            img.BorderColor3 = Color3.fromRGB(100, 50, 150)
+            img.Image = getcustomasset(fullpath)
+            img.ScaleType = Enum.ScaleType.Fit
+            img.Parent = scroll
+            
+            local name = Instance.new("TextLabel")
+            name.Size = UDim2.fromOffset(180, 20)
+            name.Position = UDim2.fromOffset(0, 180)
+            name.BackgroundTransparency = 1
+            name.Text = f:match("([^/]+)$")
+            name.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+            name.TextSize = 10
+            name.Font = Enum.Font.Gotham
+            name.TextWrapped = true
+            name.TextXAlignment = Enum.TextXAlignment.Center
+            name.Parent = img
+          end
+        end
+      end
+    end
+    y = y + 20
+  end
+  
+  local closeBtn = Instance.new("TextButton")
+  closeBtn.Size = UDim2.fromOffset(200, 50)
+  closeBtn.Position = UDim2.fromScale(0.5, 1) - UDim2.fromOffset(100, 60)
+  closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+  closeBtn.Text = "CLOSE VIEWER"
+  closeBtn.TextColor3 = Color3.new(1, 1, 1)
+  closeBtn.TextSize = 18
+  closeBtn.Font = Enum.Font.GothamBold
+  closeBtn.Parent = viewerGui
+  closeBtn.MouseButton1Click:Connect(function()
+    viewerGui:Destroy()
+    changeState("splash")
+  end)
+  
+  print("[DDLC] Asset viewer opened - press CLOSE VIEWER to return")
+end
+
 -- ========== MAIN LOOP ==========
 local conn; running = false
 function env.start()
