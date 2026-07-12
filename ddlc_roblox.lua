@@ -257,3 +257,35 @@ function env.stop()
 end
 
 print("DDLC-LOVE loaded! Run: ddlc.start()")
+
+-- Safe loadstring wrapper for executors
+local function safeLoad(code)
+  if not code or #code == 0 then return nil, "empty code" end
+  local fn, err = loadstring(code)
+  if not fn then return nil, err end
+  return fn
+end
+
+-- Try multiple ways to fetch
+local function fetchCode(url)
+  -- Try request first
+  local ok, resp = pcall(request, {Url=url, Method="GET"})
+  if ok and resp and resp.Body and #resp.Body > 0 then return resp.Body end
+  -- Try httpget/synapse
+  if httpget then return httpget(url) end
+  if syn and syn.request then
+    local r = syn.request({Url=url, Method="GET"})
+    if r and r.Body then return r.Body end
+  end
+  return nil
+end
+
+-- Auto-start with error handling
+task.spawn(function()
+  local code = fetchCode(BASE.."scripts/eng/text.lua")
+  if code then pcall(loadstring(code)) end
+  
+  -- Auto-start game after 2 seconds if not at title
+  task.wait(2)
+  if state == "title" then startGame() end
+end)
