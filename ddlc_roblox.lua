@@ -981,6 +981,10 @@ function env.start()
       end
     elseif state == "game" then
       xaload = xaload + 1
+      if xaload == 3 then
+        local fn = _G["ch" .. chapter .. "script"]
+        if fn then pcall(fn) end
+      end
       if autotimer > 0 then
         autotimer = autotimer + delta
         if autotimer > 3 then
