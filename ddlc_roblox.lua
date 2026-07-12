@@ -16,14 +16,20 @@ local function tryGCA(path)
   if ok and type(id) == "string" and #id > 0 then return id end
   return nil
 end
-function loadImg(path)
-  if imgCache[path] then return imgCache[path] end
-  -- path from asset_urls includes assets/ prefix, so just use it
-  local fullpath = DIR .. path
-  if not isfile(fullpath) then print("[DDLC] Missing asset: " .. fullpath); return nil end
-  local id = tryGCA(fullpath) or tryGCA(fullpath:gsub("/", "\\"))
-  if id then imgCache[path] = id; return id end
-  print("[DDLC] getcustomasset failed: " .. path)
+function loadImg(assetRelPath)
+  if imgCache[assetRelPath] then return imgCache[assetRelPath] end
+  -- Full path: "DDLC/" + assetRelPath (e.g., "assets/images/bg/splash.jpg")
+  local fullpath = DIR .. assetRelPath
+  if not isfile(fullpath) then
+    print("[DDLC] Missing asset: " .. assetRelPath .. " (path: " .. fullpath .. ")")
+    return nil
+  end
+  local id = tryGCA(fullpath) or tryGCA(fullpath:gsub("/", "\\\\"))
+  if id then 
+    imgCache[assetRelPath] = id
+    return id
+  end
+  print("[DDLC] getcustomasset failed: " .. assetRelPath)
   return nil
 end
 
