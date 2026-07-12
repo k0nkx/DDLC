@@ -1,13 +1,13 @@
--- DDLC-LOVE for Roblox Executor (Xeno Compatible)
--- Downloads assets from GitHub, runs visual novel via Drawing API
+-- DDLC-LOVE for Roblox Executor (Instance-based)
+-- Uses Sound, ImageLabel, TextLabel, Frame for rendering
+-- Full DDLC-LOVE story via scripts loaded from GitHub
 
 getgenv().ddlc = {}
 local env = getgenv().ddlc
-
 local BASE = "https://raw.githubusercontent.com/k0nkx/DDLC/main/"
 local DIR = "DDLC/"
 
--- ========== ASSET URLS ==========
+-- ========== ASSET URLS (same as before) ==========
 local asset_urls = {
 "assets/audio/bgm/1-loop.ogg","assets/audio/bgm/1.ogg","assets/audio/bgm/10-loop.ogg","assets/audio/bgm/10-yuri.ogg","assets/audio/bgm/10.ogg",
 "assets/audio/bgm/2-loop.ogg","assets/audio/bgm/2.ogg","assets/audio/bgm/2g.ogg","assets/audio/bgm/2g2.ogg","assets/audio/bgm/2gs.ogg",
@@ -172,8 +172,7 @@ local function fetchScript(relpath)
   if isfile(fullpath) then return readfile(fullpath) end
   local ok, resp = pcall(request, {Url=BASE .. relpath, Method="GET"})
   if ok and resp and resp.Body then
-    local parts = {}
-    for part in relpath:gmatch("[^/]+") do table.insert(parts, part) end
+    local parts = {}; for part in relpath:gmatch("[^/]+") do table.insert(parts, part) end
     if #parts > 1 then
       local dirpath = DIR
       for j = 1, #parts - 1 do
@@ -186,22 +185,118 @@ local function fetchScript(relpath)
   end
 end
 
--- ========== DRAWING SETUP ==========
-local dw, dh = 1280, 720
+-- ========== GUI SETUP ==========
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local gui = player:WaitForChild("PlayerGui")
 local vp = workspace.CurrentCamera.ViewportSize
+local sw, sh = vp.X, vp.Y
 
-local images = {}
-local textPool, squarePool = {}, {}
-local function text(key)
-  if textPool[key] then return textPool[key] end
-  local t = Drawing.new("Text"); t.Visible = false; t.Color = Color3.new(1,1,1); t.Size = 23; t.Font = 3
-  textPool[key] = t; return t
+-- Cleanup old
+local oldGui = gui:FindFirstChild("DDLCGui")
+if oldGui then oldGui:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DDLCGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = gui
+
+-- Helper: create image label
+function newImg(name, pos, size, parent)
+  local img = Instance.new("ImageLabel")
+  img.Name = name
+  img.BackgroundTransparency = 1
+  img.Position = pos or UDim2.fromScale(0,0)
+  img.Size = size or UDim2.fromScale(1,1)
+  img.Visible = false
+  img.Parent = parent or screenGui
+  return img
 end
-local function square(key)
-  if squarePool[key] then return squarePool[key] end
-  local s = Drawing.new("Square"); s.Visible = false; s.Filled = true; s.Thickness = 0
-  squarePool[key] = s; return s
+
+-- Helper: create text label
+function newTxt(name, pos, size, parent)
+  local txt = Instance.new("TextLabel")
+  txt.Name = name
+  txt.BackgroundTransparency = 1
+  txt.Position = pos or UDim2.fromScale(0,0)
+  txt.Size = size or UDim2.fromScale(1,1)
+  txt.Text = ""
+  txt.TextColor3 = Color3.new(1,1,1)
+  txt.Font = Enum.Font.GothamMedium
+  txt.TextScaled = false
+  txt.TextSize = 20
+  txt.TextXAlignment = Enum.TextXAlignment.Left
+  txt.TextYAlignment = Enum.TextYAlignment.Top
+  txt.Visible = false
+  txt.Parent = parent or screenGui
+  return txt
 end
+
+-- Helper: create frame
+function newFrm(name, pos, size, color, parent)
+  local f = Instance.new("Frame")
+  f.Name = name
+  f.BackgroundColor3 = color or Color3.new(0,0,0)
+  f.BackgroundTransparency = 0
+  f.BorderSizePixel = 0
+  f.Position = pos or UDim2.fromScale(0,0)
+  f.Size = size or UDim2.fromScale(1,1)
+  f.Visible = false
+  f.Parent = parent or screenGui
+  return f
+end
+
+-- Layers (ordered back to front)
+local bgLayer = newFrm("BgLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+bgLayer.Visible = true
+local bgImg = newImg("BgImg", UDim2.fromScale(0,0), UDim2.fromScale(1,1), bgLayer)
+local cgLayer = newFrm("CgLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0.5), screenGui)
+local cgImg = newImg("CgImg", UDim2.fromScale(0,0), UDim2.fromScale(1,1), cgLayer)
+local charLayer = newFrm("CharLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+local poemLayer = newFrm("PoemLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+local uiLayer = newFrm("UiLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+local fadeLayer = newFrm("FadeLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+local menuLayer = newFrm("MenuLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+
+-- Fade image
+local fadeImg = newImg("FadeImg", UDim2.fromScale(0,0), UDim2.fromScale(1,1), fadeLayer)
+fadeImg.BackgroundColor3 = Color3.new(0,0,0)
+fadeImg.BackgroundTransparency = 0
+fadeImg.Image = ""
+
+-- Textbox elements
+local textboxBg = newFrm("TextBoxBg", UDim2.fromScale(0, 0.78), UDim2.fromScale(1, 0.22), Color3.new(0,0,0), uiLayer)
+textboxBg.BackgroundTransparency = 0.15
+local nameboxFrm = newFrm("NameBox", UDim2.fromScale(0.03, 0.72), UDim2.fromOffset(260, 36), Color3.fromRGB(186,84,153), uiLayer)
+local nameTxt = newTxt("NameTxt", UDim2.fromOffset(10, 4), UDim2.fromOffset(240, 28), nameboxFrm)
+nameTxt.TextSize = 20
+nameTxt.Font = Enum.Font.GothamBold
+local diaTxt = newTxt("DiaTxt", UDim2.fromScale(0.04, 0.8), UDim2.fromScale(0.92, 0.18), uiLayer)
+diaTxt.TextSize = 18
+diaTxt.TextWrapped = true
+diaTxt.TextXAlignment = Enum.TextXAlignment.Left
+diaTxt.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Character image labels
+local charImgs = {}
+for _, name in ipairs({"sayori", "yuri", "natsuki", "monika"}) do
+  local ci = newImg(name, UDim2.fromScale(0,0), UDim2.fromOffset(400, 600), charLayer)
+  ci.SizeConstraint = Enum.SizeConstraint.RelativeXX
+  ci.ResampleMode = Enum.ResamplerMode.Pixelated
+  charImgs[name] = ci
+end
+
+-- Sound system
+local soundService = game:GetService("SoundService")
+local bgmSound = Instance.new("Sound")
+bgmSound.Name = "DDLCBGM"
+bgmSound.Volume = 0.5
+bgmSound.Parent = soundService
+local sfxSound = Instance.new("Sound")
+sfxSound.Name = "DDLCSFX"
+sfxSound.Volume = 0.7
+sfxSound.Parent = soundService
 
 -- ========== GAME STATE (GLOBALS for script compatibility) ==========
 state, cl, chapter = "load", 1, 0
@@ -221,15 +316,109 @@ menu_enabled, menu_type, m_selected = false, "", 2
 print_full_text, getTime, dt, xaload = false, 0, 0, 0
 autotimer, autoskip, poem_enabled = 0, 0, false
 history = {}
-startTime = 0
-timer = 0
-textbox_enabled = true
-event_enabled = false
-bgimg_disabled = false
+startTime, timer = 0, 0
+textbox_enabled, event_enabled, bgimg_disabled = true, false, false
+currentBGM = ""
 
-local bgImg, cgImg = nil, nil
+-- ========== AUDIO FUNCTIONS ==========
+function audioUpdate(audiox)
+  if audiox == nil or audiox == "0" then
+    bgmSound:Stop()
+    currentBGM = ""
+    return
+  end
+  audio1 = audiox
+  local path = DIR .. "assets/audio/bgm/" .. audiox .. ".ogg"
+  if isfile(path) then
+    local id = getcustomasset(path)
+    if bgmSound.SoundId ~= id then
+      bgmSound.SoundId = id
+      bgmSound:Play()
+    end
+    currentBGM = audiox
+  end
+end
 
--- ========== ENGINE FUNCTIONS ==========
+function sfxplay(sfxname)
+  local path = DIR .. "assets/audio/sfx/" .. sfxname .. ".ogg"
+  if isfile(path) then
+    sfxSound.SoundId = getcustomasset(path)
+    sfxSound:Play()
+  end
+end
+
+function sfxplay2(sfx) sfxplay(sfx) end
+
+-- ========== IMAGE FUNCTIONS ==========
+function bgUpdate(bgx)
+  local path = DIR .. "assets/images/bg/" .. bgx .. ".jpg"
+  if isfile(path) then
+    bgImg.Image = getcustomasset(path)
+    bgImg.Visible = true
+    bg1 = bgx
+  end
+end
+
+function cgUpdate(cgx)
+  local path = DIR .. "assets/images/cg/" .. cgx .. ".png"
+  if isfile(path) then
+    cgImg.Image = getcustomasset(path)
+    cgImg.Visible = true
+    cg1 = cgx
+  end
+end
+
+-- ========== CHARACTER FUNCTIONS ==========
+local charMap = {s="sayori", n="natsuki", y="yuri", m="monika"}
+local charProps = {
+  sayori = {ox = -200, oy = 80}, natsuki = {ox = -200, oy = 80},
+  yuri = {ox = -200, oy = 80}, monika = {ox = -200, oy = 80}
+}
+
+function loadCharacter(chr)
+  local charName = charMap[chr]
+  if not charName then return end
+  local set = (chr == 's' and s_Set or chr == 'n' and n_Set or chr == 'y' and y_Set or m_Set)
+  local a, b = set.a, set.b
+  local lr = {'',''}
+  if a == '1' then lr = {'1l','1r'}
+  elseif a == '2' then lr = {'1l','2r'}
+  elseif a == '3' and chr ~= 'y' then lr = {'2l','1r'}
+  elseif (a == '3' and chr == 'y') or (a == '4' and chr ~= 'y') then lr = {'2l','2r'}
+  elseif a == '1b' then lr = {'1bl','1br'}
+  elseif a == '2b' then lr = {'1bl','2br'}
+  elseif a == '3b' and chr ~= 'y' then lr = {'2bl','1br'}
+  elseif (a == '3b' and chr == 'y') or (a == '4b' and chr ~= 'y') then lr = {'2bl','2br'}
+  elseif (a == '4' and chr == 'y') or a == '5' then lr = {'3',''}
+  elseif a == '5a' then lr = {'3a',''}
+  elseif (a == '4b' and chr == 'y') or a == '5b' then lr = {'3b',''}
+  elseif a == '5c' then lr = {'3c',''}
+  elseif a == '5d' then lr = {'3d',''}
+  else lr = {a, ''} end
+
+  local leftPath = DIR .. "assets/images/" .. charName .. "/" .. lr[1] .. ".png"
+  local rightPath = lr[2] ~= '' and (DIR .. "assets/images/" .. charName .. "/" .. lr[2] .. ".png") or nil
+  local extraPath = b ~= '' and (DIR .. "assets/images/" .. charName .. "/" .. b .. ".png") or nil
+  local img = charImgs[charName]
+  if img and isfile(leftPath) then
+    img.Image = getcustomasset(leftPath)
+    img.Visible = true
+  end
+end
+
+function updateSayori(a, b, px) s_Set = {a=a, b=b or '', x=s_Set.x, y=0} loadCharacter('s') end
+function updateYuri(a, b, px) y_Set = {a=a, b=b or '', x=y_Set.x, y=0} loadCharacter('y') end
+function updateNatsuki(a, b, px) n_Set = {a=a, b=b or '', x=n_Set.x, y=0} loadCharacter('n') end
+function updateMonika(a, b, px) m_Set = {a=a, b=b or '', x=m_Set.x, y=0} loadCharacter('m') end
+function hideSayori() charImgs['sayori'].Visible = false; s_Set = {a='',b='',x=-675,y=4} end
+function hideYuri() charImgs['yuri'].Visible = false; y_Set = {a='',b='',x=-675,y=4} end
+function hideNatsuki() charImgs['natsuki'].Visible = false; n_Set = {a='',b='',x=-675,y=4} end
+function hideMonika() charImgs['monika'].Visible = false; m_Set = {a='',b='',x=-675,y=4} end
+function hideAll()
+  hideSayori(); hideYuri(); hideNatsuki(); hideMonika()
+end
+
+-- ========== TEXT/DIALOGUE ==========
 function cw(p1, stext, tag)
   local names = {s="Sayori", n="Natsuki", y="Yuri", m="Monika", ny="Nat & Yuri", mc=player, bl=""}
   ct = names[p1] or p1 or "Error"
@@ -243,13 +432,12 @@ function cw(p1, stext, tag)
   len = math.max(math.min(len, #stext), 1)
   if len >= #stext then print_full_text = true end
   local display = print_full_text and stext or stext:sub(1, len)
-  local wrapped = ""
-  local here = 1
-  display:gsub("(%s+)()(%S+)()", function(_, sp, word, fi)
-    if fi - here > 65 then here = sp; wrapped = wrapped .. "\n" .. word else wrapped = wrapped .. word end
-  end)
-  if wrapped == "" then wrapped = display end
-  c_disp = {wrapped}
+  c_disp = {display}
+  diaTxt.Text = display
+  nameTxt.Text = ct
+  textboxBg.Visible = true
+  nameboxFrm.Visible = ct ~= ""
+  if ct ~= "" then nameTxt.Text = ct end
   if tag and (tag == "nw" or tag == "nwfast") then scriptJump(cl + 1) end
 end
 
@@ -260,68 +448,11 @@ function n(say) cw('n',say) end
 function y(say) cw('y',say) end
 function m(say) cw('m',say) end
 
-function bgUpdate(bgx)
-  local path = "assets/images/bg/" .. bgx .. ".jpg"
-  local key = "bg_" .. bgx
-  if isfile(DIR .. path) then
-    local ca = getcustomasset(DIR .. path)
-    if not images[key] then
-      local img = Drawing.new("Image"); img.Image = ca; img.Visible = false; img.Size = Vector2.new(vp.X, vp.Y)
-      images[key] = img
-    end
-    bgImg = images[key]; bg1 = bgx
-  end
-end
-
-function cgUpdate(cgx)
-  local path = "assets/images/cg/" .. cgx .. ".png"
-  local key = "cg_" .. cgx
-  if isfile(DIR .. path) then
-    local ca = getcustomasset(DIR .. path)
-    if not images[key] then
-      local img = Drawing.new("Image"); img.Image = ca; img.Visible = false; img.Size = Vector2.new(vp.X, vp.Y)
-      images[key] = img
-    end
-    cgImg = images[key]; cg1 = cgx
-  end
-end
-
-function audioUpdate(audiox)
-  audio1 = audiox or "0"
-end
-
-function sfxplay(sfx) end
-function sfxplay2(sfx) end
-
-function updateSayori(a, b, px)
-  s_Set = {a=a, b=b or '', x=s_Set.x, y=0}
-end
-function updateYuri(a, b, px)
-  y_Set = {a=a, b=b or '', x=y_Set.x, y=0}
-end
-function updateNatsuki(a, b, px)
-  n_Set = {a=a, b=b or '', x=n_Set.x, y=0}
-end
-function updateMonika(a, b, px)
-  m_Set = {a=a, b=b or '', x=m_Set.x, y=0}
-end
-function hideSayori() s_Set = {a='',b='',x=-675,y=4} end
-function hideYuri() y_Set = {a='',b='',x=-675,y=4} end
-function hideNatsuki() n_Set = {a='',b='',x=-675,y=4} end
-function hideMonika() m_Set = {a='',b='',x=-675,y=4} end
-function hideAll()
-  s_Set = {a='',b='',x=-675,y=4}
-  y_Set = {a='',b='',x=-675,y=4}
-  n_Set = {a='',b='',x=-675,y=4}
-  m_Set = {a='',b='',x=-675,y=4}
-end
-
-function scriptJump(nu)
-  if nu then cl = nu end; xaload = 0
-end
-
+function scriptJump(nu) if nu then cl = nu end; xaload = 0 end
 function choice_enable(x) end
 function poem_disable(x) end
+
+-- ========== STATE MANAGEMENT ==========
 function changeState(cs, x)
   print("[DDLC] State: " .. tostring(cs))
   if cs == "game" then
@@ -331,44 +462,34 @@ function changeState(cs, x)
     local code = fetchScript("scripts/eng/script-ch" .. ch .. ".lua")
     if code then pcall(loadstring(code)) end
     startTime = getTime
+    bgImg.Visible = (bg1 ~= "black")
+    diaTxt.Visible = true
+    nameTxt.Visible = true
+    textboxBg.Visible = true
+    fadeImg.BackgroundTransparency = 1
   elseif cs == "title" then
     state = "title"; alpha = 0; timer = 0
+    textboxBg.Visible = false; nameboxFrm.Visible = false
   elseif cs == "splash" then
     state = "splash"; alpha = 0; timer = 0
+    local path = DIR .. "assets/images/bg/splash.jpg"
+    if isfile(path) then
+      bgImg.Image = getcustomasset(path)
+      bgImg.Visible = true
+    end
+    textboxBg.Visible = false; nameboxFrm.Visible = false
+    diaTxt.Visible = false; nameTxt.Visible = false
   end
 end
 
--- ========== RENDER ==========
-local function renderFrame()
-  local bgs = square("bg")
-  bgs.Visible = true; bgs.Color = Color3.new(0,0,0); bgs.Size = Vector2.new(vp.X, vp.Y); bgs.Position = Vector2.new(0,0)
-
-  if state == "load" then
-    local t = text("loadT"); t.Visible = true; t.Text = "Loading DDLC-LOVE..."; t.Size = 28; t.Position = Vector2.new(vp.X/2-80, vp.Y/2)
-    return
-  end
-
-  if bgImg then bgImg.Visible = true; bgImg.Position = Vector2.new(0,0) end
-  if cgImg then cgImg.Visible = true; cgImg.Position = Vector2.new(0,0) end
-
-  if state == "game" or state == "newgame" then
-    if textbox_enabled then
-      local tb = square("tb"); tb.Visible = true; tb.Color = Color3.new(0,0,0); tb.Size = Vector2.new(vp.X, vp.Y*0.2); tb.Position = Vector2.new(0, vp.Y*0.8)
-      if ct ~= "" then
-        local nb = square("nb"); nb.Visible = true; nb.Color = Color3.fromRGB(186,84,153); nb.Size = Vector2.new(200,28); nb.Position = Vector2.new(30, vp.Y*0.77)
-        local nt = text("nt"); nt.Visible = true; nt.Text = ct; nt.Size = 18; nt.Color = Color3.new(1,1,1); nt.Position = Vector2.new(40, vp.Y*0.775)
-      end
-      if c_disp[1] then
-        local dt = text("dt"); dt.Visible = true; dt.Text = c_disp[1]; dt.Size = 16; dt.Color = Color3.new(1,1,1); dt.Position = Vector2.new(40, vp.Y*0.82)
-      end
-    end
-    if autotimer > 0 then
-      local st = text("autoT"); st.Visible = true; st.Text = "Auto"; st.Size = 16; st.Position = Vector2.new(10,20); st.Color = Color3.new(1,1,1)
-    end
-  end
-
+-- ========== UPDATES ==========
+local function updateVisuals()
+  -- Fade
   if alpha < 255 then
-    local fd = square("fd"); fd.Visible = true; fd.Color = Color3.new(0,0,0); fd.Size = Vector2.new(vp.X, vp.Y); fd.Position = Vector2.new(0,0); fd.Transparency = 1 - alpha/255
+    fadeImg.BackgroundTransparency = 1 - (alpha / 255)
+    fadeImg.Visible = true
+  else
+    fadeImg.Visible = false
   end
 end
 
@@ -422,10 +543,12 @@ function env.start()
       end
       if autotimer > 0 then
         autotimer = autotimer + delta
-        if autotimer > 3 then autotimer = 0; cl = cl + 1; xaload = 0; print_full_text = false; startTime = getTime end
+        if autotimer > 3 then
+          autotimer = 0; cl = cl + 1; xaload = 0; print_full_text = false; startTime = getTime
+        end
       end
     end
-    renderFrame()
+    updateVisuals()
   end)
 
   game:GetService("UserInputService").InputBegan:Connect(onInput)
@@ -434,9 +557,8 @@ end
 function env.stop()
   running = false
   if conn then conn:Disconnect() end
-  for _, v in pairs(images) do if v and v.Visible ~= nil then v.Visible = false end end
-  for _, v in pairs(textPool) do if v and v.Visible ~= nil then v.Visible = false end end
-  for _, v in pairs(squarePool) do if v and v.Visible ~= nil then v.Visible = false end end
+  if screenGui then screenGui:Destroy() end
+  bgmSound:Stop()
 end
 
 print("DDLC-LOVE loaded! Run: ddlc.start()")
