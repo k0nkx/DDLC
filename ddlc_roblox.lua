@@ -18,8 +18,9 @@ local function tryGCA(path)
 end
 function loadImg(assetRelPath)
   if imgCache[assetRelPath] then return imgCache[assetRelPath] end
-  -- Full path: "DDLC/" + assetRelPath (e.g., "assets/images/bg/splash.jpg")
-  local fullpath = DIR .. assetRelPath
+  -- assetRelPath from callers is like "images/bg/splash.jpg"
+  -- but files are at "DDLC/assets/images/bg/splash.jpg"
+  local fullpath = DIR .. "assets/" .. assetRelPath
   if not isfile(fullpath) then
     print("[DDLC] Missing asset: " .. assetRelPath .. " (path: " .. fullpath .. ")")
     return nil
