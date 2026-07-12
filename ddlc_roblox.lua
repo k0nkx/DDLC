@@ -727,97 +727,53 @@ function env.showStartupAssetLoader()
   }
 end
 
-function env.showAssetGrid(loader, assets)
-  loader.total = #assets
-  loader.loaded = 0
-  
-  for i, path in ipairs(assets) do
-    local fullpath = DIR .. path
-    if isfile(fullpath) then
-      local img = Instance.new("ImageLabel")
-      img.Size = UDim2.fromOffset(140, 140)
-      img.BackgroundColor3 = Color3.fromRGB(30, 15, 40)
-      img.BorderSizePixel = 2
-      img.BorderColor3 = Color3.fromRGB(80, 40, 120)
-      img.Image = getcustomasset(fullpath)
-      img.ScaleType = Enum.ScaleType.Fit
-      img.LayoutOrder = i
-      img.Parent = loader.scroll
-      
-      local name = Instance.new("TextLabel")
-      name.Size = UDim2.fromOffset(140, 20)
-      name.Position = UDim2.fromOffset(0, 140)
-      name.BackgroundTransparency = 1
-      name.Text = path:match("([^/]+)$")
-      name.TextColor3 = Color3.fromRGB(200, 180, 220)
-      name.TextSize = 10
-      name.Font = Enum.Font.Gotham
-      name.TextWrapped = true
-      name.TextXAlignment = Enum.TextXAlignment.Center
-      name.Parent = img
-      
-      loader.loaded = loader.loaded + 1
-      loader.progressText.Text = string.format("%d / %d", loader.loaded, loader.total)
-      loader.progressBar.Size = UDim2.fromScale(loader.loaded / loader.total, 1)
-      loader.statusText.Text = "Loading: " .. path:match("([^/]+)$")
-      
-      -- Update canvas size
-      local rows = math.ceil(loader.loaded / 7)
-      loader.scroll.CanvasSize = UDim2.fromOffset(0, rows * 165 + 20)
-      
-      task.wait(0.02) -- Small delay so you can see them appear
-    end
-  end
-  
-  loader.progressText.Text = string.format("Done! %d / %d assets loaded", loader.loaded, loader.total)
-  loader.statusText.Text = "All assets verified - Starting game..."
-  task.wait(1.5)
-  
-  loader.gui:Destroy()
-end
-
--- ========== ASSET LOADER UI ==========
+-- ========== ASSET LOADER UI (Fast & Compact) ==========
 function env.createAssetLoader()
   local loadGui = Instance.new("ScreenGui")
   loadGui.Name = "AssetLoader"
   loadGui.ResetOnSpawn = false
   loadGui.IgnoreGuiInset = true
+  loadGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
   loadGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
   
-  local mainFrame = Instance.new("Frame")
-  mainFrame.Size = UDim2.fromScale(1, 1)
-  mainFrame.BackgroundColor3 = Color3.fromRGB(20, 10, 30)
-  mainFrame.BackgroundTransparency = 0
-  mainFrame.Parent = loadGui
+  -- Compact centered panel
+  local panel = Instance.new("Frame")
+  panel.Size = UDim2.fromOffset(400, 280)
+  panel.Position = UDim2.fromScale(0.5, 0.5)
+  panel.AnchorPoint = Vector2.new(0.5, 0.5)
+  panel.BackgroundColor3 = Color3.fromRGB(15, 8, 25)
+  panel.BorderSizePixel = 2
+  panel.BorderColor3 = Color3.fromRGB(100, 50, 150)
+  panel.Parent = loadGui
   
   local title = Instance.new("TextLabel")
-  title.Size = UDim2.fromOffset(1200, 50)
-  title.Position = UDim2.fromOffset(40, 10)
+  title.Size = UDim2.fromOffset(360, 30)
+  title.Position = UDim2.fromOffset(20, 15)
   title.BackgroundTransparency = 1
-  title.Text = "DDLC-LOVE // ASSET VERIFICATION"
+  title.Text = "DDLC-LOVE // LOADING ASSETS"
   title.TextColor3 = Color3.fromRGB(255, 200, 100)
-  title.TextSize = 28
+  title.TextSize = 18
   title.Font = Enum.Font.GothamBold
   title.TextXAlignment = Enum.TextXAlignment.Left
-  title.Parent = mainFrame
+  title.Parent = panel
   
   local statusText = Instance.new("TextLabel")
-  statusText.Size = UDim2.fromOffset(1200, 30)
-  statusText.Position = UDim2.fromOffset(40, 60)
+  statusText.Size = UDim2.fromOffset(360, 20)
+  statusText.Position = UDim2.fromOffset(20, 50)
   statusText.BackgroundTransparency = 1
-  statusText.Text = "Initializing..."
+  statusText.Text = "Verifying..."
   statusText.TextColor3 = Color3.fromRGB(180, 180, 200)
-  statusText.TextSize = 18
+  statusText.TextSize = 14
   statusText.Font = Enum.Font.Gotham
   statusText.TextXAlignment = Enum.TextXAlignment.Left
-  statusText.Parent = mainFrame
+  statusText.Parent = panel
   
   local progressBg = Instance.new("Frame")
-  progressBg.Size = UDim2.fromOffset(1200, 20)
-  progressBg.Position = UDim2.fromOffset(40, 100)
+  progressBg.Size = UDim2.fromOffset(360, 14)
+  progressBg.Position = UDim2.fromOffset(20, 80)
   progressBg.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
   progressBg.BorderSizePixel = 0
-  progressBg.Parent = mainFrame
+  progressBg.Parent = panel
   
   local progressBar = Instance.new("Frame")
   progressBar.Size = UDim2.fromScale(0, 1)
@@ -826,35 +782,36 @@ function env.createAssetLoader()
   progressBar.Parent = progressBg
   
   local progressText = Instance.new("TextLabel")
-  progressText.Size = UDim2.fromOffset(200, 20)
-  progressText.Position = UDim2.fromOffset(40, 130)
+  progressText.Size = UDim2.fromOffset(360, 20)
+  progressText.Position = UDim2.fromOffset(20, 100)
   progressText.BackgroundTransparency = 1
   progressText.Text = "0 / 0"
   progressText.TextColor3 = Color3.fromRGB(150, 150, 150)
-  progressText.TextSize = 16
+  progressText.TextSize = 14
   progressText.Font = Enum.Font.Gotham
   progressText.TextXAlignment = Enum.TextXAlignment.Left
-  progressText.Parent = mainFrame
+  progressText.Parent = panel
   
+  -- Small preview grid (just critical assets)
   local scroll = Instance.new("ScrollingFrame")
-  scroll.Size = UDim2.fromOffset(1200, 500)
-  scroll.Position = UDim2.fromOffset(40, 170)
-  scroll.CanvasSize = UDim2.fromScale(0, 3)
-  scroll.ScrollBarThickness = 6
-  scroll.BackgroundColor3 = Color3.fromRGB(15, 8, 25)
+  scroll.Size = UDim2.fromOffset(360, 150)
+  scroll.Position = UDim2.fromOffset(20, 130)
+  scroll.CanvasSize = UDim2.fromScale(0, 2)
+  scroll.ScrollBarThickness = 4
+  scroll.BackgroundColor3 = Color3.fromRGB(10, 5, 20)
   scroll.BorderSizePixel = 1
   scroll.BorderColor3 = Color3.fromRGB(60, 30, 90)
-  scroll.Parent = mainFrame
+  scroll.Parent = panel
   
   local layout = Instance.new("UIGridLayout")
-  layout.CellSize = UDim2.fromOffset(150, 150)
-  layout.CellPadding = UDim2.fromOffset(10, 10)
+  layout.CellSize = UDim2.fromOffset(80, 80)
+  layout.CellPadding = UDim2.fromOffset(6, 6)
   layout.SortOrder = Enum.SortOrder.LayoutOrder
   layout.Parent = scroll
   
   return {
     gui = loadGui,
-    mainFrame = mainFrame,
+    panel = panel,
     statusText = statusText,
     progressBar = progressBar,
     progressText = progressText,
@@ -866,16 +823,22 @@ function env.createAssetLoader()
 end
 
 function env.showAssetGrid(loader, assets)
-  loader.total = #assets
+  -- Only show first 20 assets for quick verification
+  local showAssets = {}
+  for i = 1, math.min(20, #assets) do
+    table.insert(showAssets, assets[i])
+  end
+  
+  loader.total = #showAssets
   loader.loaded = 0
   
-  for i, path in ipairs(assets) do
+  for i, path in ipairs(showAssets) do
     local fullpath = DIR .. path
     if isfile(fullpath) then
       local img = Instance.new("ImageLabel")
-      img.Size = UDim2.fromOffset(140, 140)
+      img.Size = UDim2.fromOffset(80, 80)
       img.BackgroundColor3 = Color3.fromRGB(30, 15, 40)
-      img.BorderSizePixel = 2
+      img.BorderSizePixel = 1
       img.BorderColor3 = Color3.fromRGB(80, 40, 120)
       img.Image = getcustomasset(fullpath)
       img.ScaleType = Enum.ScaleType.Fit
@@ -883,12 +846,12 @@ function env.showAssetGrid(loader, assets)
       img.Parent = loader.scroll
       
       local name = Instance.new("TextLabel")
-      name.Size = UDim2.fromOffset(140, 20)
-      name.Position = UDim2.fromOffset(0, 140)
+      name.Size = UDim2.fromOffset(80, 14)
+      name.Position = UDim2.fromOffset(0, 80)
       name.BackgroundTransparency = 1
       name.Text = path:match("([^/]+)$")
       name.TextColor3 = Color3.fromRGB(200, 180, 220)
-      name.TextSize = 10
+      name.TextSize = 8
       name.Font = Enum.Font.Gotham
       name.TextWrapped = true
       name.TextXAlignment = Enum.TextXAlignment.Center
@@ -897,19 +860,13 @@ function env.showAssetGrid(loader, assets)
       loader.loaded = loader.loaded + 1
       loader.progressText.Text = string.format("%d / %d", loader.loaded, loader.total)
       loader.progressBar.Size = UDim2.fromScale(loader.loaded / loader.total, 1)
-      loader.statusText.Text = "Loading: " .. path:match("([^/]+)$")
-      
-      -- Update canvas size
-      local rows = math.ceil(loader.loaded / 7)
-      loader.scroll.CanvasSize = UDim2.fromOffset(0, rows * 165 + 20)
-      
-      task.wait(0.02) -- Small delay so you can see them appear
+      loader.statusText.Text = "Verifying: " .. path:match("([^/]+)$")
     end
   end
   
-  loader.progressText.Text = string.format("Done! %d / %d assets loaded", loader.loaded, loader.total)
-  loader.statusText.Text = "All assets verified - Starting game..."
-  task.wait(1.5)
+  loader.progressText.Text = string.format("Done! %d assets verified", loader.loaded)
+  loader.statusText.Text = "All critical assets OK - Starting game..."
+  task.wait(0.5)
   
   loader.gui:Destroy()
 end
@@ -922,11 +879,11 @@ function env.start()
   running = true
   print("[DDLC] Starting...")
   
-  -- Show visual asset loader first
+  -- Show visual asset loader first (compact, fast)
   local loader = env.createAssetLoader()
   local allAssets = {}
   for _, url in ipairs(asset_urls) do
-    if url:match("%.png$") or url:match("%.jpg$") or url:match("%.ogg$") then
+    if url:match("%.png$") or url:match("%.jpg$") then
       table.insert(allAssets, url)
     end
   end
