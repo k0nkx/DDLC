@@ -7,7 +7,26 @@ local env = getgenv().ddlc
 local BASE = "https://raw.githubusercontent.com/k0nkx/DDLC/main/"
 local DIR = "DDLC/"
 
--- ========== ASSET URLS (same as before) ==========
+-- ========== IMAGE LOADER ==========
+local imgCache = {}
+local useDrawing = false
+pcall(function() if Drawing and Drawing.new then local d = Drawing.new("Image"); d:Remove() end end)
+local function tryGCA(path)
+  local ok, id = pcall(getcustomasset, path)
+  if ok and type(id) == "string" and #id > 0 then return id end
+  return nil
+end
+function loadImg(path)
+  if imgCache[path] then return imgCache[path] end
+  local fullpath = DIR .. path
+  if not isfile(fullpath) then print("[DDLC] Missing asset: " .. path); return nil end
+  local id = tryGCA(fullpath) or tryGCA(fullpath:gsub("/", "\\"))
+  if id then imgCache[path] = id; return id end
+  print("[DDLC] getcustomasset failed: " .. path)
+  return nil
+end
+
+-- ========== ASSET URLS ==========
 local asset_urls = {
 "assets/audio/bgm/1-loop.ogg","assets/audio/bgm/1.ogg","assets/audio/bgm/10-loop.ogg","assets/audio/bgm/10-yuri.ogg","assets/audio/bgm/10.ogg",
 "assets/audio/bgm/2-loop.ogg","assets/audio/bgm/2.ogg","assets/audio/bgm/2g.ogg","assets/audio/bgm/2g2.ogg","assets/audio/bgm/2gs.ogg",
@@ -260,7 +279,7 @@ function newFrm(name, pos, size, color, parent)
 end
 
 -- Layers (ordered back to front)
-local bgLayer = newFrm("BgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+local bgLayer = newFrm("BgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.fromRGB(30, 15, 40), mainFrm)
 bgLayer.Visible = true
 local bgImg = newImg("BgImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), bgLayer)
 local cgLayer = newFrm("CgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0.5), mainFrm)
@@ -362,18 +381,21 @@ function sfxplay2(sfx) sfxplay(sfx) end
 
 -- ========== IMAGE FUNCTIONS ==========
 function bgUpdate(bgx)
-  local path = DIR .. "assets/images/bg/" .. bgx .. ".jpg"
-  if isfile(path) then
-    bgImg.Image = getcustomasset(path)
+  local id = loadImg("images/bg/" .. bgx .. ".jpg")
+  if id then
+    bgImg.Image = id
     bgImg.Visible = true
     bg1 = bgx
+  else
+    bgImg.Visible = false
+    bg1 = "black"
   end
 end
 
 function cgUpdate(cgx)
-  local path = DIR .. "assets/images/cg/" .. cgx .. ".png"
-  if isfile(path) then
-    cgImg.Image = getcustomasset(path)
+  local id = loadImg("images/cg/" .. cgx .. ".png")
+  if id then
+    cgImg.Image = id
     cgImg.Visible = true
     cg1 = cgx
   end
@@ -407,13 +429,16 @@ function loadCharacter(chr)
   elseif a == '5d' then lr = {'3d',''}
   else lr = {a, ''} end
 
-  local leftPath = DIR .. "assets/images/" .. charName .. "/" .. lr[1] .. ".png"
-  local rightPath = lr[2] ~= '' and (DIR .. "assets/images/" .. charName .. "/" .. lr[2] .. ".png") or nil
-  local extraPath = b ~= '' and (DIR .. "assets/images/" .. charName .. "/" .. b .. ".png") or nil
+  local leftPath = "images/" .. charName .. "/" .. lr[1] .. ".png"
+  local rightPath = lr[2] ~= '' and ("images/" .. charName .. "/" .. lr[2] .. ".png") or nil
+  local extraPath = b ~= '' and ("images/" .. charName .. "/" .. b .. ".png") or nil
   local img = charImgs[charName]
-  if img and isfile(leftPath) then
-    img.Image = getcustomasset(leftPath)
-    img.Visible = true
+  if img then
+    local id = loadImg(leftPath)
+    if id then
+      img.Image = id
+      img.Visible = true
+    end
   end
 end
 
@@ -503,24 +528,20 @@ function changeState(cs, x)
     diaTxt.Visible = false; nameTxt.Visible = false
     fadeLayer.Visible = true; fadeImg.Visible = true
     fadeImg.BackgroundTransparency = 1
-    local path = DIR .. "assets/images/bg/splash.jpg"
-    if isfile(path) then
-      bgImg.Image = getcustomasset(path)
+    local id = loadImg("images/bg/splash.jpg")
+    if id then
+      bgImg.Image = id
       bgImg.Visible = true; bgLayer.Visible = true
-      print("[DDLC] Title splash bg loaded")
     else
-      print("[DDLC] splash.jpg not found at: " .. path)
+      bgImg.Visible = false; bgLayer.Visible = true
     end
   elseif cs == "splash" then
     state = "splash"; alpha = 255; timer = 0
     bgLayer.Visible = true; bgImg.Visible = false
-    local path = DIR .. "assets/images/bg/splash.jpg"
-    if isfile(path) then
-      bgImg.Image = getcustomasset(path)
+    local id = loadImg("images/bg/splash.jpg")
+    if id then
+      bgImg.Image = id
       bgImg.Visible = true
-      print("[DDLC] Splash bg loaded OK")
-    else
-      print("[DDLC] splash.jpg NOT FOUND at: " .. path)
     end
     textboxBg.Visible = false; nameboxFrm.Visible = false
     diaTxt.Visible = false; nameTxt.Visible = false
