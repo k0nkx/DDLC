@@ -13,8 +13,8 @@ Port to Roblox Executor by asianyuh
 -- ============================================================
 -- CONFIGURATION - EDIT THESE FOR YOUR GITHUB REPO
 -- ============================================================
-GITHUB_USER = "YOUR_USER"
-GITHUB_REPO = "YOUR_REPO"
+GITHUB_USER = "k0nkx"
+GITHUB_REPO = "DDLC"
 GITHUB_BRANCH = "main"
 GITHUB_BASE = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH
 ASSET_URL = GITHUB_BASE .. "/assets"
