@@ -297,22 +297,31 @@ function newFrm(name, pos, size, color, parent)
   return f
 end
 
--- Layers (ordered back to front)
+-- Layers (ordered back to front with explicit ZIndex)
 local bgLayer = newFrm("BgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.fromRGB(30, 15, 40), mainFrm)
-bgLayer.Visible = true
+bgLayer.Visible = true; bgLayer.ZIndex = 1
 local bgImg = newImg("BgImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), bgLayer)
+bgImg.ZIndex = 1
 local cgLayer = newFrm("CgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0.5), mainFrm)
+cgLayer.ZIndex = 2
 local cgImg = newImg("CgImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), cgLayer)
+cgImg.ZIndex = 2
 local charLayer = newFrm("CharLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+charLayer.ZIndex = 3
 local poemLayer = newFrm("PoemLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+poemLayer.ZIndex = 4
 local uiLayer = newFrm("UiLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+uiLayer.ZIndex = 5
 local fadeLayer = newFrm("FadeLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+fadeLayer.ZIndex = 6
 local menuLayer = newFrm("MenuLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+menuLayer.ZIndex = 7
 
 -- Fade image
 local fadeImg = newImg("FadeImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), fadeLayer)
 fadeImg.BackgroundColor3 = Color3.new(0,0,0)
 fadeImg.BackgroundTransparency = 0
+fadeImg.ZIndex = 6
 
 -- Textbox elements (1280x720 coordinate space)
 local textboxBg = newFrm("TextBoxBg", UDim2.fromOffset(0, 560), UDim2.fromOffset(1280, 160), Color3.new(0,0,0), uiLayer)
@@ -588,12 +597,49 @@ local function onInput(input, gpe)
   end
 end
 
+-- ========== ASSET VERIFICATION ==========
+function env.verifyCriticalAssets()
+  print("[DDLC] Verifying critical assets...")
+  local critical = {
+    "images/bg/splash.jpg",
+    "images/bg/black.jpg", 
+    "images/bg/bedroom.jpg",
+    "images/bg/class.jpg",
+    "images/bg/club.jpg",
+    "images/gui/textbox.png",
+    "images/gui/namebox.png",
+    "images/sayori/1l.png",
+    "images/natsuki/1l.png",
+    "images/yuri/1l.png",
+    "images/monika/1l.png",
+    "audio/bgm/1.ogg",
+    "audio/bgm/2.ogg",
+  }
+  local missing = {}
+  for _, path in ipairs(critical) do
+    local fullpath = DIR .. "assets/" .. path
+    if not isfile(fullpath) then
+      table.insert(missing, path)
+    end
+  end
+  if #missing > 0 then
+    warn("[DDLC] MISSING CRITICAL ASSETS: " .. table.concat(missing, ", "))
+    warn("[DDLC] Run downloadAssets() first or check GitHub")
+    return false
+  end
+  print("[DDLC] All critical assets verified OK")
+  return true
+end
+
 -- ========== MAIN LOOP ==========
 local conn; running = false
 function env.start()
   if running then return end
   running = true
   print("[DDLC] Starting...")
+  if not env.verifyCriticalAssets() then
+    print("[DDLC] Asset verification failed - continuing anyway (will download missing)")
+  end
   env.downloadAssets()
   local textCode = fetchScript("scripts/eng/text.lua")
   if textCode then pcall(loadstring(textCode)) end
