@@ -746,7 +746,7 @@ function env.createAssetLoader()
   loadGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
   loadGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
   
-  -- Compact centered panel
+-- Compact centered panel (40% bigger: 560x392)
   local panel = Instance.new("Frame")
   panel.Size = UDim2.fromOffset(560, 392)
   panel.Position = UDim2.fromScale(0.5, 0.5)
@@ -964,6 +964,7 @@ function env.stop()
 end
 
 print("DDLC-LOVE loaded! Run: ddlc.start()")
+
 
 
 
