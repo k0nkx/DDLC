@@ -1,21 +1,20 @@
-
 --[[
 DDLC-ROBLOX - Doki Doki Literature Club
 Based on DDLC-LOVE
-Port to Roblox Executor by asianyuh SIKE WITH AI
+Port to Roblox Executor by asianyuh
 ]]--
 
---[[ DDLC-ROBLOX Engine v1
+--[[ DDLC-ROBLOX Engine v1.0
      Love2D
-     This file is part of the DDLC Roblox port.
+     This file is part of the DDLC Roblox port
      All assets must be hosted on GitHub and URLs configured below.
 --]]
 
 -- ============================================================
 -- CONFIGURATION - EDIT THESE FOR YOUR GITHUB REPO
 -- ============================================================
-GITHUB_USER = "k0nkx"
-GITHUB_REPO = "DDLC"
+GITHUB_USER = "YOUR_USER"
+GITHUB_REPO = "YOUR_REPO"
 GITHUB_BRANCH = "main"
 GITHUB_BASE = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH
 ASSET_URL = GITHUB_BASE .. "/assets"
@@ -211,6 +210,12 @@ local function sv(v) return v * screenScaleX end
 -- ============================================================
 -- HTTP REQUEST (cross-executor compatible)
 -- ============================================================
+local downloadCount = 0
+local totalDownloads = 0
+local function printProgress(msg)
+    print("[DDLC] " .. msg)
+end
+
 local function httpGet(url)
     local success, result = pcall(function()
         return HttpService:GetAsync(url, false)
@@ -754,11 +759,12 @@ audio_bgm = nil
 audio_bgmloop = nil
 sfx1 = nil
 sfx2 = nil
-audioCacheDir = "ddlc_audio/"
+audioCacheDir = "DDLC/audio/"
 
 -- Ensure audio cache directory exists
 pcall(function()
     if not isfolder then return end
+    if not isfolder("DDLC") then makefolder("DDLC") end
     if not isfolder(audioCacheDir) then makefolder(audioCacheDir) end
 end)
 
@@ -770,11 +776,14 @@ function cacheAudioFile(url, cacheName)
         if isfile and isfile(localPath) then needDownload = false end
     end)
     if needDownload then
+        printProgress("Downloading audio: " .. cacheName)
         local success, data = pcall(httpGet, url)
         if success and data and #data > 100 then
             pcall(function() writefile(localPath, data) end)
+            printProgress("  Saved: " .. cacheName .. " (" .. math.floor(#data/1024) .. "KB)")
             return localPath
         end
+        printProgress("  Failed: " .. cacheName)
         return nil
     end
     return localPath
@@ -1497,11 +1506,15 @@ function changeState(cstate, x)
 end
 
 function runChapterScript(ch)
+    printProgress("Loading chapter script: ch" .. ch)
     local url = SCRIPT_URL .. "/eng/script-ch" .. ch .. ".lua"
     local ok, data = pcall(httpGet, url)
     if ok and data then
         local func, err = loadstring(data)
         if func then pcall(func) end
+        printProgress("  Chapter " .. ch .. " loaded")
+    else
+        printProgress("  ERROR: Chapter " .. ch .. " failed to load")
     end
     if persistent.ptr == 0 then
         local pw = poemwinner[chapter]
@@ -1624,13 +1637,16 @@ function updateLoad()
     l_timer = l_timer + 1
     if l_timer < 50 then
         -- Wait
-    elseif l_timer >= 50 and l_timer <= 80 then
+    elseif l_timer == 50 then
+        printProgress("Loading save data...")
         loadpersistent()
         loadsettings()
+        printProgress("  Save data loaded")
     elseif l_timer >= 96 and l_timer <= 105 then
+        if l_timer == 96 then printProgress("Preloading assets from GitHub...") end
         loaderAssets(l_timer)
-    elseif l_timer >= 106 then
-        -- Skip language text loading (embedded in engine)
+    elseif l_timer == 106 then
+        printProgress("Assets ready, starting game...")
     end
     if l_timer >= 120 then
         if persistent.ptr == 4 then
@@ -2086,6 +2102,7 @@ function scriptCheck()
 end
 
 function loadPoemResponses()
+    printProgress("Loading poem response scripts...")
     local ok, data = pcall(httpGet, SCRIPT_URL .. "/eng/script-poemresponses.lua")
     if ok then pcall(loadstring(data)) end
     ok, data = pcall(httpGet, SCRIPT_URL .. "/eng/poems.lua")
@@ -2099,6 +2116,7 @@ function loadPoemResponses()
         ok, data = pcall(httpGet, SCRIPT_URL .. "/eng/script-poemresponses2.lua")
         if ok then pcall(loadstring(data)) end
     end
+    printProgress("  Poem scripts loaded")
 end
 
 function updateConsole(text, text2, text3, text4)
@@ -2196,8 +2214,9 @@ function event_init(etype, arg1, arg2)
     if xaload == 1 then
         -- Load event sub-scripts from GitHub
         local evt = persistent.ptr <= 1 and "event-1" or (persistent.ptr == 2 and "event-2" or "event-3")
+        printProgress("Loading event script: " .. evt)
         local ok, evtData = pcall(httpGet, SCRIPT_URL .. "/" .. evt .. ".lua")
-        if ok then pcall(loadstring(evtData)) end
+        if ok then pcall(loadstring(evtData)); printProgress("  Event script loaded") end
         if etype == "s_kill" then
             s_kill = loadImageFromURL(ASSET_URL .. "/images/cg/s_kill/s_kill.png", "s_kill")
             s_kill2 = loadImageFromURL(ASSET_URL .. "/images/cg/s_kill/s_kill2.png", "s_kill2")
