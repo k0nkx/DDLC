@@ -202,15 +202,26 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = gui
 
+-- Main container: 1280x720 centered
+local mainFrm = Instance.new("Frame")
+mainFrm.Name = "Main"
+mainFrm.BackgroundColor3 = Color3.new(0,0,0)
+mainFrm.BorderSizePixel = 0
+mainFrm.Size = UDim2.fromOffset(1280, 720)
+mainFrm.Position = UDim2.fromScale(0.5, 0.5)
+mainFrm.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrm.ClipsDescendants = true
+mainFrm.Parent = screenGui
+
 -- Helper: create image label
 function newImg(name, pos, size, parent)
   local img = Instance.new("ImageLabel")
   img.Name = name
   img.BackgroundTransparency = 1
-  img.Position = pos or UDim2.fromScale(0,0)
-  img.Size = size or UDim2.fromScale(1,1)
+  img.Position = pos or UDim2.fromOffset(0,0)
+  img.Size = size or UDim2.fromOffset(1280, 720)
   img.Visible = false
-  img.Parent = parent or screenGui
+  img.Parent = parent or mainFrm
   return img
 end
 
@@ -219,8 +230,8 @@ function newTxt(name, pos, size, parent)
   local txt = Instance.new("TextLabel")
   txt.Name = name
   txt.BackgroundTransparency = 1
-  txt.Position = pos or UDim2.fromScale(0,0)
-  txt.Size = size or UDim2.fromScale(1,1)
+  txt.Position = pos or UDim2.fromOffset(0,0)
+  txt.Size = size or UDim2.fromOffset(1280, 720)
   txt.Text = ""
   txt.TextColor3 = Color3.new(1,1,1)
   txt.Font = Enum.Font.GothamMedium
@@ -228,8 +239,9 @@ function newTxt(name, pos, size, parent)
   txt.TextSize = 20
   txt.TextXAlignment = Enum.TextXAlignment.Left
   txt.TextYAlignment = Enum.TextYAlignment.Top
+  txt.RichText = true
   txt.Visible = false
-  txt.Parent = parent or screenGui
+  txt.Parent = parent or mainFrm
   return txt
 end
 
@@ -240,40 +252,39 @@ function newFrm(name, pos, size, color, parent)
   f.BackgroundColor3 = color or Color3.new(0,0,0)
   f.BackgroundTransparency = 0
   f.BorderSizePixel = 0
-  f.Position = pos or UDim2.fromScale(0,0)
-  f.Size = size or UDim2.fromScale(1,1)
+  f.Position = pos or UDim2.fromOffset(0,0)
+  f.Size = size or UDim2.fromOffset(1280, 720)
   f.Visible = false
-  f.Parent = parent or screenGui
+  f.Parent = parent or mainFrm
   return f
 end
 
 -- Layers (ordered back to front)
-local bgLayer = newFrm("BgLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+local bgLayer = newFrm("BgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
 bgLayer.Visible = true
-local bgImg = newImg("BgImg", UDim2.fromScale(0,0), UDim2.fromScale(1,1), bgLayer)
-local cgLayer = newFrm("CgLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0.5), screenGui)
-local cgImg = newImg("CgImg", UDim2.fromScale(0,0), UDim2.fromScale(1,1), cgLayer)
-local charLayer = newFrm("CharLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
-local poemLayer = newFrm("PoemLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
-local uiLayer = newFrm("UiLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
-local fadeLayer = newFrm("FadeLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
-local menuLayer = newFrm("MenuLayer", UDim2.fromScale(0,0), UDim2.fromScale(1,1), Color3.new(0,0,0), screenGui)
+local bgImg = newImg("BgImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), bgLayer)
+local cgLayer = newFrm("CgLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0.5), mainFrm)
+local cgImg = newImg("CgImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), cgLayer)
+local charLayer = newFrm("CharLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+local poemLayer = newFrm("PoemLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+local uiLayer = newFrm("UiLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+local fadeLayer = newFrm("FadeLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
+local menuLayer = newFrm("MenuLayer", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), Color3.new(0,0,0), mainFrm)
 
 -- Fade image
-local fadeImg = newImg("FadeImg", UDim2.fromScale(0,0), UDim2.fromScale(1,1), fadeLayer)
+local fadeImg = newImg("FadeImg", UDim2.fromOffset(0,0), UDim2.fromOffset(1280, 720), fadeLayer)
 fadeImg.BackgroundColor3 = Color3.new(0,0,0)
 fadeImg.BackgroundTransparency = 0
-fadeImg.Image = ""
 
--- Textbox elements
-local textboxBg = newFrm("TextBoxBg", UDim2.fromScale(0, 0.78), UDim2.fromScale(1, 0.22), Color3.new(0,0,0), uiLayer)
-textboxBg.BackgroundTransparency = 0.15
-local nameboxFrm = newFrm("NameBox", UDim2.fromScale(0.03, 0.72), UDim2.fromOffset(260, 36), Color3.fromRGB(186,84,153), uiLayer)
+-- Textbox elements (1280x720 coordinate space)
+local textboxBg = newFrm("TextBoxBg", UDim2.fromOffset(0, 560), UDim2.fromOffset(1280, 160), Color3.new(0,0,0), uiLayer)
+textboxBg.BackgroundTransparency = 0.2
+local nameboxFrm = newFrm("NameBox", UDim2.fromOffset(40, 520), UDim2.fromOffset(260, 36), Color3.fromRGB(186,84,153), uiLayer)
 local nameTxt = newTxt("NameTxt", UDim2.fromOffset(10, 4), UDim2.fromOffset(240, 28), nameboxFrm)
 nameTxt.TextSize = 20
 nameTxt.Font = Enum.Font.GothamBold
-local diaTxt = newTxt("DiaTxt", UDim2.fromScale(0.04, 0.8), UDim2.fromScale(0.92, 0.18), uiLayer)
-diaTxt.TextSize = 18
+local diaTxt = newTxt("DiaTxt", UDim2.fromOffset(50, 580), UDim2.fromOffset(1180, 130), uiLayer)
+diaTxt.TextSize = 19
 diaTxt.TextWrapped = true
 diaTxt.TextXAlignment = Enum.TextXAlignment.Left
 diaTxt.TextYAlignment = Enum.TextYAlignment.Top
@@ -452,44 +463,69 @@ function scriptJump(nu) if nu then cl = nu end; xaload = 0 end
 function choice_enable(x) end
 function poem_disable(x) end
 
+-- Loading text
+local loadTxt = newTxt("LoadTxt", UDim2.fromOffset(400, 340), UDim2.fromOffset(480, 40), mainFrm)
+loadTxt.Text = "Loading DDLC-LOVE..."
+loadTxt.TextSize = 28
+loadTxt.TextXAlignment = Enum.TextXAlignment.Center
+loadTxt.TextColor3 = Color3.new(1,1,1)
+loadTxt.Visible = true
+
 -- ========== STATE MANAGEMENT ==========
 function changeState(cs, x)
   print("[DDLC] State: " .. tostring(cs))
+  loadTxt.Visible = false
   if cs == "game" then
     hideAll(); xaload = 0; state = "game"
     if x == 1 then cl = 1; chapter = persistent.ptr * 10 end
     local ch = chapter
     local code = fetchScript("scripts/eng/script-ch" .. ch .. ".lua")
-    if code then pcall(loadstring(code)) end
+    if code then
+      local ok, err = pcall(loadstring(code))
+      if not ok then warn("[DDLC] Script error: " .. tostring(err)) end
+    end
     startTime = getTime
+    bgLayer.Visible = true
     bgImg.Visible = (bg1 ~= "black")
+    cgLayer.Visible = true
+    charLayer.Visible = true
     diaTxt.Visible = true
     nameTxt.Visible = true
+    nameboxFrm.Visible = true
     textboxBg.Visible = true
+    uiLayer.Visible = true
+    fadeLayer.Visible = true
     fadeImg.BackgroundTransparency = 1
+    print("[DDLC] Game state - chapter: " .. ch .. ", cl: " .. cl)
   elseif cs == "title" then
     state = "title"; alpha = 0; timer = 0
     textboxBg.Visible = false; nameboxFrm.Visible = false
+    diaTxt.Visible = false; nameTxt.Visible = false
+    fadeLayer.Visible = true; fadeImg.Visible = true
+    fadeImg.BackgroundTransparency = 1
+    local path = DIR .. "assets/images/bg/splash.jpg"
+    if isfile(path) then
+      bgImg.Image = getcustomasset(path)
+      bgImg.Visible = true; bgLayer.Visible = true
+      print("[DDLC] Title splash bg loaded")
+    else
+      print("[DDLC] splash.jpg not found at: " .. path)
+    end
   elseif cs == "splash" then
-    state = "splash"; alpha = 0; timer = 0
+    state = "splash"; alpha = 255; timer = 0
+    bgLayer.Visible = true; bgImg.Visible = false
     local path = DIR .. "assets/images/bg/splash.jpg"
     if isfile(path) then
       bgImg.Image = getcustomasset(path)
       bgImg.Visible = true
+      print("[DDLC] Splash bg loaded OK")
+    else
+      print("[DDLC] splash.jpg NOT FOUND at: " .. path)
     end
     textboxBg.Visible = false; nameboxFrm.Visible = false
     diaTxt.Visible = false; nameTxt.Visible = false
-  end
-end
-
--- ========== UPDATES ==========
-local function updateVisuals()
-  -- Fade
-  if alpha < 255 then
-    fadeImg.BackgroundTransparency = 1 - (alpha / 255)
-    fadeImg.Visible = true
-  else
-    fadeImg.Visible = false
+    fadeLayer.Visible = true; fadeImg.Visible = true
+    fadeImg.BackgroundTransparency = 0
   end
 end
 
@@ -529,12 +565,17 @@ function env.start()
     dt = delta; getTime = getTime + delta
     if state == "splash" then
       timer = timer + delta
-      if timer < 3 then alpha = math.min(alpha + 7.75 * delta * 60, 255)
-      else alpha = math.max(alpha - 7.75 * delta * 60, 0)
-        if alpha == 0 and timer > 4 then changeState("title") end
+      local speed = 7.75 * delta * 60
+      if timer < 3 then
+        alpha = math.max(alpha - speed, 0)
+        fadeImg.BackgroundTransparency = alpha / 255
+      else
+        alpha = math.min(alpha + speed, 255)
+        fadeImg.BackgroundTransparency = alpha / 255
+        if alpha >= 255 and timer > 4 then changeState("title") end
       end
     elseif state == "title" then
-      timer = timer + delta; alpha = math.min(alpha + 5 * delta * 60, 255)
+      timer = timer + delta
     elseif state == "game" then
       xaload = xaload + 1
       if xaload > 2 then
@@ -548,7 +589,6 @@ function env.start()
         end
       end
     end
-    updateVisuals()
   end)
 
   game:GetService("UserInputService").InputBegan:Connect(onInput)
