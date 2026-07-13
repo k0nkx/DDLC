@@ -520,10 +520,6 @@ function scriptJump(nu, fu, au)
   end
 end
 
--- Sync writable globals from sandbox back to _G after a script call
--- Strategy A: getfenv (reads sandbox env directly)
--- Strategy B: __sandbox_bridge__ table shared via __index
-_G.__sandbox_bridge__ = {}
 local function syncSandboxGlobals(fn)
   if not fn then return end
   if getfenv then
@@ -532,13 +528,7 @@ local function syncSandboxGlobals(fn)
       for _, k in ipairs({"cl","chapter","player","poemstate","warning_msg","menutext","choices","choicepick","poemwinner","appeal","alpha","wordlist"}) do
         if senv[k] ~= nil then _G[k] = senv[k] end
       end
-      return
     end
-  end
-  -- Fallback: read from __sandbox_bridge__ (set by script sync code)
-  for k, v in pairs(_G.__sandbox_bridge__) do
-    _G[k] = v
-    _G.__sandbox_bridge__[k] = nil
   end
 end
 
@@ -670,33 +660,41 @@ function changeState(cstate, x)
 end
 
 -- Chapter script runner
--- loadstring creates an isolated sandbox. The sandbox CAN read globals from
--- _G via __index, but writes go to its private env. So we redirect all
--- "function name()" declarations to "__scriptFns__['name'] = function()".
--- __scriptFns__ itself is read from _G (shared), so writes to the TABLE
--- land in our global table. Then we copy them to _G.
-_G.__scriptFns__ = {}
+-- Strategy A: compile original code + setfenv(fn, _G) so function defs
+-- write directly to the real global table.
+-- Strategy B: if setfenv unavailable, gsub "function name()" ->
+-- "_G.name = function()" so the write goes through to _G directly.
 
--- Execute a script file, returning all functions defined in it
 function execScript(relpath)
   local code = env.loadScript(relpath)
-  if not code then return end
-  local modified = code:gsub("^(%s*)function%s+(%w+)%s*(%b())", function(spc, fname, args)
-    return spc .. "__scriptFns__['" .. fname .. "'] = function" .. args
-  end)
-  local ok, compiled = loadstring(modified)
-  if compiled then
-    pcall(compiled)
-    local n = 0
-    for name, fn in pairs(_G.__scriptFns__) do
-      if type(fn) == "function" and _G[name] ~= fn then
-        _G[name] = fn; n = n + 1
-      end
+  if not code then
+    debugTxt.Text = "ERR: script not found " .. relpath
+    return
+  end
+  -- Strategy A: try compiling original, set env to _G
+  local fn, err = loadstring(code)
+  if fn then
+    if setfenv then
+      setfenv(fn, _G)
     end
-    debugTxt.Text = "execScript " .. relpath .. " (" .. n .. " fns)"
-    if n == 0 then debugTxt.Text = "WARN: execScript " .. relpath .. " returned 0 fns" end
+    local ok2, pcerr = pcall(fn)
+    if ok2 then
+      debugTxt.Text = "exec " .. relpath .. " OK"
+    else
+      debugTxt.Text = "exec " .. relpath .. " ERR: " .. tostring(pcerr)
+    end
+    return
+  end
+  -- Strategy B: gsub -> _G.name = function()
+  local modified = code:gsub("^(%s*)function%s+(%w+)%s*(%b())", function(spc, fname, args)
+    return spc .. "_G." .. fname .. " = function" .. args
+  end)
+  local fn2, err2 = loadstring(modified)
+  if fn2 then
+    pcall(fn2)
+    debugTxt.Text = "exec(gsub) " .. relpath .. " OK"
   else
-    debugTxt.Text = "FAIL compile " .. relpath
+    debugTxt.Text = "FAIL compile " .. relpath .. ": " .. tostring(err or err2 or "?")
   end
 end
 
@@ -722,18 +720,22 @@ function startPoemGame()
   env.poemstate = 0
 
   execScript("scripts/eng/poemwords.lua")
-  if poemwords then
-    local fn = poemwords
-    pcall(fn)
-    syncSandboxGlobals(fn)
+  if type(poemwords) == "function" then
+    pcall(poemwords)
+    syncSandboxGlobals(poemwords)
+  end
+  local wl = wordlist
+  if type(wl) ~= "table" and getfenv and type(poemwords) == "function" then
+    local senv = getfenv(poemwords)
+    if senv and type(senv.wordlist) == "table" then wl = senv.wordlist end
   end
   env.wordlist = {}
-  if type(wordlist) == "table" then
-    for i = 1, math.min(10, #wordlist) do
-      local idx = math.random(1, #wordlist)
-      env.wordlist[i] = wordlist[idx]
-      table.remove(wordlist, idx)
-      if #wordlist == 0 then break end
+  if type(wl) == "table" then
+    for i = 1, math.min(10, #wl) do
+      local idx = math.random(1, #wl)
+      env.wordlist[i] = wl[idx]
+      table.remove(wl, idx)
+      if #wl == 0 then break end
     end
   end
 end
