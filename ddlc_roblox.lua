@@ -250,9 +250,7 @@ local function createTitleBtns()
     b.Font = Enum.Font.GothamBold; b.TextSize = 24
     b.Parent = mainFrm; b.ZIndex = 7; b.Visible = false
     b.MouseButton1Click:Connect(function()
-      if not menu_enabled then
-        m_selected = i + 1; menu_confirm()
-      end
+      m_selected = i + 1; menu_confirm()
     end)
     titleBtns[txt] = b; yp = yp + 65
   end
@@ -626,6 +624,13 @@ function changeState(cs, x)
     alpha = 0; audioUpdate("1"); s_timer = 0
   elseif cs == "title" then
     alpha = 0; audioUpdate("1")
+    menu_enable("title")
+    local p = "assets/images/gui/menu_bg.jpg"
+    local lp = getFile(p, true)
+    if lp then local _, id = pcall(getcustomasset, lp); if _ and id then bgImg.Image = id; bgImg.Visible = true end end
+    for _, b in pairs(titleBtns) do if b then b.Visible = true end end
+    hideAll()
+    charLayer.Visible = false; uiLayer.Visible = false; cgLayer.Visible = false
   elseif cs == "game" and x == 1 then
     cl = 1; chapter = persistent.ptr * 10
     if persistent.ptr == 0 and persistent.chr.m == 0 then cl = 10001 end
@@ -753,8 +758,11 @@ end)
 -- Main loop
 RunSvc.RenderStepped:Connect(function(dt)
   getTime = getTime + dt
-  posX = posX - dt * 37.5; posY = posY - dt * 37.5
-  if posX <= -200 then posX = 0 end; if posY <= -200 then posY = 0 end
+
+  if state == "title" then
+    posX = posX - dt * 37.5; posY = posY - dt * 37.5
+    if posX <= -200 then posX = 0 end; if posY <= -200 then posY = 0 end
+  end
 
   if state == "load" then
     l_timer = l_timer + 1
@@ -770,7 +778,7 @@ RunSvc.RenderStepped:Connect(function(dt)
     updateGame()
   end
 
-  if bgImg.Visible and bgImg.Image ~= "" then
+  if state == "title" and bgImg.Visible and bgImg.Image ~= "" then
     bgImg.Position = UDim2.fromOffset(posX, posY)
   end
 end)
