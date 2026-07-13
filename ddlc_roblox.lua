@@ -537,11 +537,24 @@ function scriptCheck()
   syncGlobals()
   local fn = _G["ch" .. chapter .. "script"]
   if fn then
+    local senv = getfenv and getfenv(fn)
+    if senv then
+      senv.cl = env.cl; senv.xaload = env.xaload
+      senv.chapter = env.chapter; senv.player = env.player
+      senv.bg1 = env.bg1; senv.audio1 = env.audio1
+      senv.cg1 = env.cg1; senv.ct = env.ct
+      senv.alpha = env.alpha; senv.poemstate = env.poemstate
+    end
     local ok, err = pcall(fn)
+    if senv then
+      env.cl = senv.cl or env.cl; env.xaload = senv.xaload or env.xaload
+      env.chapter = senv.chapter or env.chapter
+      env.poemstate = senv.poemstate or env.poemstate
+    end
     syncSandboxGlobals(fn)
     if not ok then
-      print("[DDLC] Script error cl=" .. tostring(cl) .. ": " .. tostring(err))
-      debugTxt.Text = "ERROR: " .. tostring(err)
+      print("[DDLC] Script error cl=" .. tostring(env.cl) .. ": " .. tostring(err))
+      debugTxt.Text = "ERR: " .. tostring(err)
     end
   end
   syncFromGlobals()
@@ -665,7 +678,24 @@ function execScript(relpath)
     debugTxt.Text = "ERR: script not found " .. relpath
     return
   end
-  local fn, err = loadstring(code)
+  -- Prepend variable assignments so they exist in the sandbox env
+  local p = ""
+  local sv = {
+    cl=env.cl, chapter=env.chapter, xaload=env.xaload,
+    bg1=env.bg1, audio1=env.audio1, cg1=env.cg1, ct=env.ct,
+    player=env.player, textbox_enabled=env.textbox_enabled,
+    poemstate=env.poemstate, alpha=env.alpha, poemsread=env.poemsread,
+  }
+  for k, v in pairs(sv) do
+    if v ~= nil then
+      if type(v) == "string" then p = p .. k .. "=" .. string.format("%q", v) .. ";"
+      else p = p .. k .. "=" .. tostring(v) .. ";"
+      end
+    end
+  end
+  p = p .. "choices={};poemwinner={};appeal={};wordlist={};"
+  local modified = p .. "\n" .. code
+  local fn, err = loadstring(modified)
   if not fn then
     debugTxt.Text = "FAIL compile " .. relpath .. ": " .. tostring(err or "?")
     return
@@ -675,23 +705,20 @@ function execScript(relpath)
     debugTxt.Text = "ERR exec " .. relpath .. ": " .. tostring(pcerr)
     return
   end
-  local env = getfenv and getfenv(fn)
+  local senv = getfenv and getfenv(fn)
   local n = 0
-  if env then
-    for k, v in pairs(env) do
+  if senv then
+    for k, v in pairs(senv) do
       if type(v) == "function" and _G[k] ~= v then
         _G[k] = v; n = n + 1
       end
-    end
-    for _, k in ipairs({"cl","chapter","xaload","poemstate","warning_msg","menutext","choices","choicepick","poemwinner","appeal","alpha","wordlist"}) do
-      if env[k] ~= nil then _G[k] = env[k] end
     end
   else
     for k, v in pairs(_G) do
       if type(v) == "function" and k:match("^ch%d+script$") then n = n + 1 end
     end
   end
-  debugTxt.Text = "exec " .. relpath .. " (" .. n .. " fns, getfenv=" .. tostring(getfenv ~= nil) .. ")"
+  debugTxt.Text = "exec " .. relpath .. " (" .. n .. " fns)"
 end
 
 function loadChapter(ch)
