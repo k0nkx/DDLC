@@ -381,9 +381,11 @@ function sfxplay2(sfx)
   sfx:Play()
 end
 
--- Character loading
--- Mapping from original loader/characters.lua loadCharacter()
+-- Character loading (matches original loader/characters.lua + draw.lua)
 local charMap = {s="sayori",n="natsuki",y="yuri",m="monika"}
+local with_r = {'1','1b','2','2b','3','3b','4','4b'}
+local with_yr = {'1','1b','2','2b','3','3b'}
+
 local function charLR(chr, a)
   local lr = {"",""}
   if a == "1" then lr = {"1l","1r"}
@@ -410,26 +412,38 @@ function loadCharacterSprite(chr, a)
   local lr = charLR(chr, a)
   local img = charImgs[cn]
   if not img then return end
+
+  -- Left half: always load if available
   if lr[1] ~= "" then
     local id = env.loadImg("images/" .. cn .. "/" .. lr[1] .. ".png")
     img.left.Image = id or ""; img.left.Visible = id ~= nil
   else
     img.left.Visible = false
   end
+
+  -- Right half: only show for poses listed in with_r / with_yr
+  local r_show = false
   if lr[2] ~= "" then
-    local id = env.loadImg("images/" .. cn .. "/" .. lr[2] .. ".png")
-    img.right.Image = id or ""; img.right.Visible = id ~= nil
-  else
-    img.right.Visible = false
+    local check = (chr == "y") and with_yr or with_r
+    for _, p in ipairs(check) do
+      if p == a then r_show = true; break end
+    end
+    if r_show then
+      local id = env.loadImg("images/" .. cn .. "/" .. lr[2] .. ".png")
+      img.right.Image = id or ""
+    end
   end
+  img.right.Visible = r_show
 end
 
 local function setCharPos(n, px)
   local c = charImgs[n]
   if not c then return end
-  local x = px or 0
-  c.left.Position = UDim2.fromOffset(x, 60)
-  c.right.Position = UDim2.fromOffset(x + 250, 60)
+  -- Original: chset.y = px*3.2
+  local x = (px or 0) * 3.2
+  -- Both halves overlaid at same position (original draws l and r at same set.x)
+  c.left.Position = UDim2.fromOffset(x, 4)
+  c.right.Position = UDim2.fromOffset(x, 4)
 end
 
 function updateSayori(a, b, px)
@@ -463,10 +477,10 @@ function hideMonika() local c=charImgs["monika"]; if c then c.left.Visible=false
 
 function hideAll()
   for _, c in pairs(charImgs) do c.left.Visible = false; c.right.Visible = false end
-  env.s_Set = {a="",b="",x=-200,y=0}
-  env.y_Set = {a="",b="",x=-200,y=0}
-  env.n_Set = {a="",b="",x=-200,y=0}
-  env.m_Set = {a="",b="",x=-200,y=0}
+  env.s_Set = {a="",b="",x=-675,y=4}
+  env.y_Set = {a="",b="",x=-675,y=4}
+  env.n_Set = {a="",b="",x=-675,y=4}
+  env.m_Set = {a="",b="",x=-675,y=4}
 end
 
 -- Dialogue system
