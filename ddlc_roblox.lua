@@ -1,58 +1,67 @@
--- DDLC-LOVE Roblox Full Conversion
--- Auto-generated from DDLC-LOVE v1.2.2
--- https://github.com/k0nkx/DDLC
+--[[
+  DDLC-LOVE for Roblox Executor - Complete Game Conversion
+  Xeno v1.3.55 | Instance-based, PlayerGui only
+  Assets downloaded from GitHub to DDLC/ folder
+  Auto-starts on execution
+]]
 
 local env = {}
 getgenv().ddlc = env
 
+-- CONFIG
 local BASE = "https://raw.githubusercontent.com/k0nkx/DDLC/main/"
 local DIR = "DDLC/"
+local VERSION = "v1.2.2"
+local assetsToDownload = {}
 
-local function ensureDir(p)
-  local parts = {}
-  for part in p:gmatch("[^/]+") do table.insert(parts, part) end
-  local acc = ""
-  for i = 1, #parts do
-    acc = acc .. parts[i] .. "/"
-    if not isfolder(acc) then makefolder(acc) end
-  end
-end
-
-local function downloadFile(url, localPath, silent)
-  if isfile(localPath) then return end
-  if not silent then print("[DDLC] Downloading: " .. url) end
-  local ok, resp = pcall(request, {Url = url, Method = "GET"})
-  if ok and resp and resp.Body then
-    local parent = localPath:match("^(.+)/[^/]+$")
-    if parent then ensureDir(parent) end
-    writefile(localPath, resp.Body)
-    if not silent then print("[DDLC] Downloaded: " .. localPath) end
-  else
-    warn("[DDLC] Failed: " .. url)
-  end
-end
-
-local function getFile(relPath, silent)
-  local full = DIR .. relPath
-  if isfile(full) then return full end
-  downloadFile(BASE .. relPath, full, silent)
-  if isfile(full) then return full end
-  return nil
-end
-
-local function readScript(relPath)
-  local full = DIR .. relPath
-  if isfile(full) then return readfile(full) end
-  downloadFile(BASE .. relPath, full)
-  if isfile(full) then return readfile(full) end
-  return nil
-end
-
+-- ASSET CACHE
 local imgCache = {}
-local function getCachedAsset(path)
+local audioCache = {}
+local scriptCache = {}
+
+-- SERVICES
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local gui = player:WaitForChild("PlayerGui")
+local uis = game:GetService("UserInputService")
+local rs = game:GetService("RunService")
+local ss = game:GetService("SoundService")
+
+-- ============================================================
+-- ASSET MANAGER
+-- ============================================================
+
+local function ensureDir(relpath)
+  local parts = {}
+  for p in relpath:gmatch("[^/]+") do table.insert(parts, p) end
+  local dp = DIR
+  for i = 1, #parts - 1 do
+    dp = dp .. parts[i] .. "/"
+    if not isfolder(dp) then
+      makefolder(dp)
+      print("[DDLC-DL] Created folder: " .. dp)
+    end
+  end
+end
+
+function env.downloadFile(relpath)
+  local full = DIR .. relpath
+  if isfile(full) then return full end
+  local ok, resp = pcall(request, { Url = BASE .. relpath, Method = "GET" })
+  if ok and resp and resp.Body then
+    ensureDir(relpath)
+    writefile(full, resp.Body)
+    print("[DDLC-DL] " .. relpath)
+    return full
+  end
+  return nil
+end
+
+function env.loadImg(path)
   if imgCache[path] then return imgCache[path] end
-  local full = DIR .. path
-  if not isfile(full) then return nil end
+  local ap = "assets/" .. path
+  local full = env.downloadFile(ap)
+  if not full then return nil end
   local ok, id = pcall(getcustomasset, full)
   if ok and id and type(id) == "string" and #id > 0 then
     imgCache[path] = id
@@ -61,425 +70,376 @@ local function getCachedAsset(path)
   return nil
 end
 
--- Persistent state
-player = "Player"
-persistent = { ptr = 0, clear = {0,0,0,0,0,0,0,0,0}, chr = {m = 1, s = 1}, act2 = {0,0,0,0} }
-settings = { textspd = 75, autospd = 4, lang = "eng", masvol = 80, bgmvol = 80, sfxvol = 80, o = 0 }
-cl = 1; bg1 = "black"; audio1 = "0"; cg1 = "blank"; ct = ""
-s_Set = { a = "", b = "", x = -200, y = 0 }
-y_Set = { a = "", b = "", x = -200, y = 0 }
-n_Set = { a = "", b = "", x = -200, y = 0 }
-m_Set = { a = "", b = "", x = -200, y = 0 }
-chapter = 0
-readpoem = { s = 0, n = 0, y = 0, m = 0 }
-choices = { "", "", "", "" }
-choicepick = ""
-poemsread = -1
-s_poemappeal = { 0, 0, 0 }; n_poemappeal = { 0, 0, 0 }; y_poemappeal = { 0, 0, 0 }
-poemwinner = { "", "", "" }; appeal = { s = 0, n = 0, y = 0 }
-savenumber = 1
-state = "load"
-menu_enabled = false; menu_type = nil; menu_alpha = 0; m_selected = 2
-textbox_enabled = true; poem_enabled = false; event_enabled = false
-bgalpha = 255; cgalpha = 255; alpha = 255
-getTime = 0; startTime = 0; autotimer = 0; autoskip = 0
-posX = -40; posY = 0; xaload = 0; unitimer = 0; uniduration = 0.25
-sectimer = 0; last_text = ""; print_full_text = false
-c_disp = {}; history = {}
-style_edited = false
-tlp = { yx = 525, nx = 670, sx = 470, mx = 680, yy = 850, ny = 850, sy = 850, my = 850, scale = 0.75 }
-z_timer = { 0, 0 }; y_timer = 0; titlebg_ypos = -240
-s_timer = 0; l_timer = 95
-sp = {}
-local sprr = {}; for i = 1, 11 do sprr[i] = i end
-for i = 1, 3 do local r = math.random(1, #sprr); sp[i] = sprr[r]; table.remove(sprr, r) end
-gui = {}; tr = {}
-console_enabled = false
+function env.loadAudio(path)
+  if audioCache[path] then return audioCache[path] end
+  local ap = "assets/" .. path
+  local full = env.downloadFile(ap)
+  if not full then return nil end
+  local ok, id = pcall(getcustomasset, full)
+  if ok and id then
+    audioCache[path] = id
+    return id
+  end
+  return nil
+end
 
--- GUI Setup
-local Players = game:GetService("Players")
-local playerObj = Players.LocalPlayer
-local RunSvc = game:GetService("RunService")
-local UserISvc = game:GetService("UserInputService")
-local SoundSvc = game:GetService("SoundService")
-local playerGui = playerObj:WaitForChild("PlayerGui")
+function env.loadScript(relpath)
+  if scriptCache[relpath] then return scriptCache[relpath] end
+  local full = DIR .. relpath
+  if isfile(full) then
+    local code = readfile(full)
+    scriptCache[relpath] = code
+    return code
+  end
+  local ok, resp = pcall(request, { Url = BASE .. relpath, Method = "GET" })
+  if ok and resp and resp.Body then
+    ensureDir(relpath)
+    writefile(full, resp.Body)
+    print("[DDLC-DL] " .. relpath)
+    scriptCache[relpath] = resp.Body
+    return resp.Body
+  end
+  return nil
+end
 
-local oldGui = playerGui:FindFirstChild("DDLCGui")
-if oldGui then oldGui:Destroy() end
-local oldBgm = SoundSvc:FindFirstChild("DDLCBGM")
-if oldBgm then oldBgm:Destroy() end
+-- ============================================================
+-- UI SETUP
+-- ============================================================
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DDLCGui"; screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true; screenGui.DisplayOrder = 100
-screenGui.Parent = playerGui
+screenGui.Name = "DDLCGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = gui
 
 local mainFrm = Instance.new("Frame")
-mainFrm.Name = "Main"; mainFrm.BackgroundTransparency = 1
+mainFrm.Name = "Main"
+mainFrm.BackgroundTransparency = 1
 mainFrm.Size = UDim2.fromOffset(1280, 720)
 mainFrm.Position = UDim2.fromScale(0.5, 0.5)
 mainFrm.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrm.ClipsDescendants = true
 mainFrm.Parent = screenGui
 
-local function newImg(n, pos, sz, parent)
+local function newFrm(n, pos, size, color, parent, z)
+  local f = Instance.new("Frame")
+  f.Name = n; f.BackgroundColor3 = color or Color3.new(0,0,0)
+  f.BackgroundTransparency = 0; f.BorderSizePixel = 0
+  f.Position = pos or UDim2.fromOffset(0,0)
+  f.Size = size or UDim2.fromOffset(1280,720)
+  f.Visible = false; f.Parent = parent or mainFrm
+  if z then f.ZIndex = z end
+  return f
+end
+local function newImg(n, pos, size, parent, z)
   local i = Instance.new("ImageLabel")
   i.Name = n; i.BackgroundTransparency = 1
   i.Position = pos or UDim2.fromOffset(0,0)
-  i.Size = sz or UDim2.fromOffset(1280,720)
+  i.Size = size or UDim2.fromOffset(1280,720)
   i.Visible = false; i.Parent = parent or mainFrm
+  if z then i.ZIndex = z end
   return i
 end
-
-local function newTxt(n, pos, sz, parent)
+local function newTxt(n, pos, size, parent, z)
   local t = Instance.new("TextLabel")
   t.Name = n; t.BackgroundTransparency = 1
   t.Position = pos or UDim2.fromOffset(0,0)
-  t.Size = sz or UDim2.fromOffset(1280,720)
+  t.Size = size or UDim2.fromOffset(1280,720)
   t.Text = ""; t.TextColor3 = Color3.new(1,1,1)
   t.Font = Enum.Font.GothamMedium; t.TextSize = 20
   t.TextXAlignment = Enum.TextXAlignment.Left
   t.TextYAlignment = Enum.TextYAlignment.Top
   t.Visible = false; t.Parent = parent or mainFrm
-  t.RichText = true
+  if z then t.ZIndex = z end
   return t
 end
-
-local function newFrm(n, pos, sz, col, parent)
-  local f = Instance.new("Frame")
-  f.Name = n; f.BackgroundColor3 = col or Color3.new(0,0,0)
-  f.BackgroundTransparency = 0; f.BorderSizePixel = 0
-  f.Position = pos or UDim2.fromOffset(0,0)
-  f.Size = sz or UDim2.fromOffset(1280,720)
-  f.Visible = false; f.Parent = parent or mainFrm
-  return f
+local function newBtn(n, pos, size, text, col1, col2, parent, z)
+  local b = Instance.new("TextButton")
+  b.Name = n; b.BackgroundColor3 = col1 or Color3.fromRGB(40,20,60)
+  b.BorderSizePixel = 2; b.BorderColor3 = col2 or Color3.fromRGB(100,50,150)
+  b.Position = pos; b.Size = size
+  b.Text = text or ""; b.TextColor3 = Color3.new(1,1,1)
+  b.Font = Enum.Font.GothamBold; b.TextSize = 24
+  b.Visible = false; b.Parent = parent or mainFrm
+  if z then b.ZIndex = z end
+  return b
 end
 
--- Layers
-local bgLayer = newFrm("BgLayer", nil, nil, Color3.new(0,0,0))
-bgLayer.Visible = true; bgLayer.ZIndex = 1; bgLayer.BackgroundTransparency = 0
-local bgImg = newImg("BgImg", nil, nil, bgLayer)
-bgImg.ZIndex = 1; bgImg.BackgroundColor3 = Color3.new(0,0,0); bgImg.BackgroundTransparency = 0
-local bgImg2 = newImg("BgImg2", nil, nil, bgLayer)
-bgImg2.ZIndex = 2; bgImg2.BackgroundColor3 = Color3.new(0,0,0); bgImg2.BackgroundTransparency = 0
+-- LAYERS (ZIndex)
+local bgLayer = newFrm("BgLayer", nil, nil, Color3.new(0,0,0), mainFrm, 1)
+bgLayer.Visible = true
+local bgImg = newImg("BgImg", nil, nil, bgLayer, 1)
+local bgFade = newFrm("BgFade", nil, nil, Color3.new(0,0,0), bgLayer, 1)
+bgFade.BackgroundTransparency = 1
 
-local cgLayer = newFrm("CgLayer", nil, nil, Color3.new(0,0,0))
-cgLayer.ZIndex = 3; cgLayer.BackgroundTransparency = 0
-local cgImg = newImg("CgImg", nil, nil, cgLayer)
-cgImg.ZIndex = 3; cgImg.BackgroundColor3 = Color3.new(0,0,0); cgImg.BackgroundTransparency = 0
+local cgLayer = newFrm("CgLayer", nil, nil, Color3.new(0,0,0), mainFrm, 2)
+local cgImg = newImg("CgImg", nil, nil, cgLayer, 2)
 
-local charLayer = newFrm("CharLayer", nil, nil, Color3.new(0,0,0))
-charLayer.ZIndex = 4; charLayer.BackgroundTransparency = 1
-local uiLayer = newFrm("UiLayer", nil, nil, Color3.new(0,0,0))
-uiLayer.ZIndex = 5; uiLayer.BackgroundTransparency = 1
-local fadeLayer = newFrm("FadeLayer", nil, nil, Color3.new(0,0,0))
-fadeLayer.ZIndex = 6; fadeLayer.BackgroundTransparency = 0
-local menuLayer = newFrm("MenuLayer", nil, nil, Color3.new(0,0,0))
-menuLayer.ZIndex = 7; menuLayer.BackgroundTransparency = 1
-local overlayLayer = newFrm("OverlayLayer", nil, nil, Color3.new(0,0,0))
-overlayLayer.ZIndex = 8; overlayLayer.BackgroundTransparency = 1
-
-local fadeImg = newImg("FadeImg", nil, nil, fadeLayer)
-fadeImg.BackgroundColor3 = Color3.new(0,0,0); fadeImg.BackgroundTransparency = 0; fadeImg.ZIndex = 6
-
--- Textbox
-local textboxBg = newFrm("TextBoxBg", UDim2.fromOffset(0,560), UDim2.fromOffset(1280,160), Color3.fromRGB(0,0,0), uiLayer)
-textboxBg.BackgroundTransparency = 0.2; textboxBg.ZIndex = 5
-local nameboxFrm = newFrm("NameBox", UDim2.fromOffset(40,520), UDim2.fromOffset(260,36), Color3.fromRGB(186,84,153), uiLayer)
-nameboxFrm.ZIndex = 5
-local nameTxt = newTxt("NameTxt", UDim2.fromOffset(10,4), UDim2.fromOffset(240,28), nameboxFrm)
-nameTxt.TextSize = 20; nameTxt.Font = Enum.Font.GothamBold; nameTxt.ZIndex = 5
-nameTxt.TextColor3 = Color3.new(0,0,0)
-local diaTxt = newTxt("DiaTxt", UDim2.fromOffset(50,580), UDim2.fromOffset(1180,130), uiLayer)
-diaTxt.TextSize = 19; diaTxt.TextWrapped = true; diaTxt.ZIndex = 5
-diaTxt.TextColor3 = Color3.new(1,1,1)
-local ctcImg = newImg("CtcImg", UDim2.fromOffset(1015,685), UDim2.fromOffset(30,20), uiLayer)
-ctcImg.ZIndex = 5
-
--- Characters
+local charLayer = newFrm("CharLayer", nil, nil, Color3.new(0,0,0), mainFrm, 3)
+charLayer.Visible = true
 local charImgs = {}
-for _, name in ipairs({"sayori","yuri","natsuki","monika"}) do
-  local ci = newImg(name, UDim2.fromScale(0,0), UDim2.fromOffset(400,600), charLayer)
+for _, nm in ipairs({"sayori","yuri","natsuki","monika"}) do
+  local ci = newImg(nm, UDim2.fromOffset(0,60), UDim2.fromOffset(500,600), charLayer, 3)
   ci.SizeConstraint = Enum.SizeConstraint.RelativeXX
   ci.ResampleMode = Enum.ResamplerMode.Pixelated
-  ci.ZIndex = 4
-  charImgs[name] = ci
+  charImgs[nm] = ci
 end
 
--- Loading bar
-local loadBar = newFrm("LoadBar", UDim2.fromOffset(0,710), UDim2.fromOffset(0,10), Color3.fromRGB(255,255,255))
-loadBar.ZIndex = 10; loadBar.BackgroundTransparency = 0; loadBar.Visible = false
+local uiLayer = newFrm("UiLayer", nil, nil, Color3.new(0,0,0), mainFrm, 4)
+uiLayer.Visible = true
 
--- Splash text
-local splashTxt = newTxt("SplashTxt", UDim2.fromOffset(440,300), UDim2.fromOffset(400,400))
-splashTxt.TextSize = 20; splashTxt.TextWrapped = true; splashTxt.ZIndex = 9
-splashTxt.TextColor3 = Color3.new(0,0,0); splashTxt.TextXAlignment = Enum.TextXAlignment.Left
+local fadeLayer = newFrm("FadeLayer", nil, nil, Color3.new(0,0,0), mainFrm, 5)
+local fadeImg = newImg("FadeImg", nil, nil, fadeLayer, 5)
+fadeImg.BackgroundColor3 = Color3.new(0,0,0); fadeImg.BackgroundTransparency = 0
 
--- Name input
-local nameBox = Instance.new("TextBox")
-nameBox.Size = UDim2.fromOffset(400,40); nameBox.Position = UDim2.fromOffset(440,200)
-nameBox.Visible = false; nameBox.Text = ""; nameBox.ZIndex = 10
-nameBox.PlaceholderText = "Enter name and press Enter"
-nameBox.Font = Enum.Font.GothamBold; nameBox.TextSize = 24
-nameBox.TextColor3 = Color3.new(1,1,1)
-nameBox.BackgroundColor3 = Color3.fromRGB(40,20,60)
-nameBox.BorderSizePixel = 2; nameBox.BorderColor3 = Color3.fromRGB(100,50,150)
-nameBox.Parent = mainFrm
-nameBox.FocusLost:Connect(function(enter)
-  if enter and #nameBox.Text > 0 then
-    player = nameBox.Text; nameBox.Visible = false; keyboard = false
-    changeState("game", 1)
+local menuLayer = newFrm("MenuLayer", nil, nil, Color3.new(0,0,0), mainFrm, 6)
+
+-- LOADING
+local loadingLabel = newTxt("LoadingLabel", UDim2.fromOffset(0,300), UDim2.fromOffset(1280,100), mainFrm)
+loadingLabel.Text = "DDLC-LOVE Loading..."
+loadingLabel.TextSize = 36; loadingLabel.Font = Enum.Font.GothamBold
+loadingLabel.TextColor3 = Color3.fromRGB(255,200,100); loadingLabel.Visible = true
+loadingLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+-- TEXTBOX
+local textboxBg = newFrm("TextBoxBg", UDim2.fromOffset(0,560), UDim2.fromOffset(1280,160), Color3.new(0,0,0), uiLayer)
+textboxBg.BackgroundTransparency = 0.2
+local nameboxFrm = newFrm("NameBox", UDim2.fromOffset(40,520), UDim2.fromOffset(260,36), Color3.fromRGB(186,84,153), uiLayer)
+local nameTxt = newTxt("NameTxt", UDim2.fromOffset(10,4), UDim2.fromOffset(240,28), nameboxFrm)
+nameTxt.TextSize = 20; nameTxt.Font = Enum.Font.GothamBold
+local diaTxt = newTxt("DiaTxt", UDim2.fromOffset(50,580), UDim2.fromOffset(1180,130), uiLayer)
+diaTxt.TextSize = 19; diaTxt.TextWrapped = true; diaTxt.RichText = true
+
+-- AUDIO
+local bgmSound = Instance.new("Sound"); bgmSound.Name="DDLCBGM"
+bgmSound.Volume=0.5; bgmSound.Parent=ss
+local sfx1 = Instance.new("Sound"); sfx1.Name="DDLCSFX1"
+sfx1.Volume=0.7; sfx1.Parent=ss
+
+-- ============================================================
+-- GAME VARIABLES
+-- ============================================================
+
+env.state = "init"
+env.running = true
+env.alpha = 255; env.bg1 = "black"; env.cg1 = "blank"; env.audio1 = "0"
+env.cl = 1; env.chapter = 0; env.ct = ""; env.c_disp = {"","","",""}
+env.xaload = 0; env.sectimer = 0; env.getTime = 0; env.startTime = 0
+env.autotimer = 0; env.autoskip = 0; env.unitimer = 0; env.uniduration = 0.25
+env.print_full_text = false; env.last_text = ""
+env.player = ""; env.menu_enabled = false; env.menu_type = nil
+env.poem_enabled = false; env.event_enabled = false
+env.textbox_enabled = true; env.bgimg_disabled = false
+env.history = {}; env.choices = {"","","",""}; env.choicepick = ""
+env.poemsread = -1; env.readpoem = {s=0,n=0,y=0,m=0}
+env.poemwinner = {"","",""}; env.appeal = {s=0,n=0,y=0}
+env.s_poemappeal = {0,0,0}; env.n_poemappeal = {0,0,0}; env.y_poemappeal = {0,0,0}
+env.splashTimer = 0; env.menu_alpha = 0
+env.tlp = {yx=525,nx=670,sx=470,mx=680,yy=850,ny=850,sy=850,my=850,scale=0.75}
+env.z_timer = {0,0}; env.y_timer = 0; env.titlebg_ypos = -240
+env.posX = -40; env.posY = 0
+
+-- Character sets
+env.s_Set = {a="",b="",x=-200,y=0}
+env.y_Set = {a="",b="",x=-200,y=0}
+env.n_Set = {a="",b="",x=-200,y=0}
+env.m_Set = {a="",b="",x=-200,y=0}
+env.changeX = {s={x=0,y=0,z=0},y={x=0,y=0,z=0},n={x=0,y=0,z=0},m={x=0,y=0,z=0}}
+
+-- Persistent data
+env.persistent = {ptr=0,chr={m=1,s=1},clear={0,0,0,0,0,0,0,0,0},act2={0,0,0,0}}
+env.settings = {textspd=75,autospd=4,lang="eng",masvol=80,bgmvol=80,sfxvol=80,o=0}
+
+-- ============================================================
+-- TRANSLATION DATA
+-- ============================================================
+
+local tr = {
+  names = {"Sayori","Natsuki","Yuri","Monika","Nat & Yuri"},
+  splash = {"This game is not suitable for children","  or those who are easily disturbed.","Now everyone can be happy.","Unofficial port by LukeeGD"},
+  menuitem = {"Yes","No","Delete ","Restore All"},
+  menuhelp = {" - Advances through the game"," - Auto-Forward On/Off"," - Skipping On/Off"," - Enter Game Menu"," - Exit Menu","Managing files: Go to Settings > Characters","Deleting save data: Delete the save folder","There's no point in saving anymore.","Are you sure you want to return to the main menu?","Are you sure you want to quit?",""," - Toggle text outline"},
+  auto = "Auto-Forward On",
+  skip = "Skipping",
+  selectlang = "Select language:"
+}
+
+-- ============================================================
+-- UI HELPER FUNCTIONS
+-- ============================================================
+
+local menuItems = {}
+local function clearMenuItems()
+  for _, v in ipairs(menuItems) do
+    pcall(v.Destroy, v)
   end
-end)
-
--- Title buttons
-local titleBtns = {}
-local function createTitleBtns()
-  for _, b in pairs(titleBtns) do if b then pcall(function() b:Destroy() end) end end
-  titleBtns = {}
-  local items = {"NEW GAME","LOAD","SETTINGS","HELP","QUIT"}
-  local yp = 250
-  for i, txt in ipairs(items) do
-    local b = Instance.new("TextButton")
-    b.Name = "TB"..i
-    b.BackgroundColor3 = Color3.fromRGB(40,20,60)
-    b.BorderSizePixel = 2; b.BorderColor3 = Color3.fromRGB(100,50,150)
-    b.Position = UDim2.fromOffset(440, yp)
-    b.Size = UDim2.fromOffset(400,50)
-    b.Text = txt; b.TextColor3 = Color3.new(1,1,1)
-    b.Font = Enum.Font.GothamBold; b.TextSize = 24
-    b.Parent = mainFrm; b.ZIndex = 7; b.Visible = false
-    b.MouseButton1Click:Connect(function()
-      m_selected = i + 1; menu_confirm()
-    end)
-    titleBtns[txt] = b; yp = yp + 65
-  end
-end
-createTitleBtns()
-
--- Audio
-local bgmS = Instance.new("Sound"); bgmS.Name = "DDLCBGM"; bgmS.Volume = 0.5; bgmS.Parent = SoundSvc
-local bgmLpS = Instance.new("Sound"); bgmLpS.Name = "DDLCBGML"; bgmLpS.Volume = 0.5; bgmLpS.Parent = SoundSvc
-local sfx1S = Instance.new("Sound"); sfx1S.Name = "DDLCSFX1"; sfx1S.Volume = 0.7; sfx1S.Parent = SoundSvc
-
--- Audio functions
-local audio_wloop = {"1","2","3","4","4g","5","5_monika","5_natsuki","5_sayori","5_yuri","6","7g","8","10","d","monika-end"}
-
-local function game_setvolume()
-  local mv = (settings.masvol or 80)/100
-  local bv = (settings.bgmvol or 80)/100*mv
-  local sv = (settings.sfxvol or 80)/100*mv
-  bgmS.Volume = bv; bgmLpS.Volume = bv; sfx1S.Volume = sv
+  menuItems = {}
 end
 
-function audioUpdate(ax, fl)
-  if audio1 ~= ax or fl then
-    bgmS:Stop(); bgmLpS:Stop()
-    if ax ~= "" and ax ~= "0" then
-      local p
-      if ax == "credits" or ax == "end-voice" then
-        p = "assets/audio/bgm/"..settings.lang.."/"..ax..".ogg"
-      else
-        p = "assets/audio/bgm/"..ax..".ogg"
-      end
-      local lp = getFile(p, true)
-      if lp then
-        local ok, id = pcall(getcustomasset, lp)
-        if ok and id then
-          bgmS.SoundId = id
-          local looped = false
-          for _, w in ipairs(audio_wloop) do
-            if ax == w then
-              local lp2 = getFile("assets/audio/bgm/"..ax.."-loop.ogg", true)
-              if lp2 then
-                local ok2, lid = pcall(getcustomasset, lp2)
-                if ok2 and lid then
-                  bgmLpS.SoundId = lid; bgmLpS.Looped = true
-                  bgmS.Looped = false; looped = true
-                end
-              end
-            end
-          end
-          if not looped then
-            if ax == "2g" then
-              local lp2 = getFile("assets/audio/bgm/2-loop.ogg", true)
-              if lp2 then local _, lid = pcall(getcustomasset, lp2); if _ and lid then bgmLpS.SoundId = lid; bgmLpS.Looped = true; bgmS.Looped = false; looped = true end end
-            elseif ax == "3g" or ax == "3g2" then
-              local lp2 = getFile("assets/audio/bgm/3-loop.ogg", true)
-              if lp2 then local _, lid = pcall(getcustomasset, lp2); if _ and lid then bgmLpS.SoundId = lid; bgmLpS.Looped = true; bgmS.Looped = false; looped = true end end
-            elseif ax == "7" then
-              local lp2 = getFile("assets/audio/bgm/"..(persistent.ptr==2 and "7a" or "7-loop")..".ogg", true)
-              if lp2 then local _, lid = pcall(getcustomasset, lp2); if _ and lid then bgmLpS.SoundId = lid; bgmLpS.Looped = true; bgmS.Looped = false; looped = true end end
-            end
-          end
-          if not looped then bgmS.Looped = true end
-          game_setvolume(); bgmS:Play()
-        end
-      end
-    end
-  end
-  audio1 = ax
+local function addMenuItem(item)
+  table.insert(menuItems, item)
 end
 
-function sfxplay(sfx)
-  if sfx ~= "" then
-    local p = "assets/audio/sfx/"..sfx..".ogg"
-    local lp = getFile(p, true)
-    if lp then
-      local ok, id = pcall(getcustomasset, lp)
-      if ok and id then
-        local c = Instance.new("Sound")
-        c.SoundId = id; c.Volume = (settings.sfxvol/100)*(settings.masvol/100)
-        c.Parent = SoundSvc; c:Play()
-        c.Ended:Connect(function() c:Destroy() end)
-      end
-    end
-  end
+local function showTextBox(show)
+  textboxBg.Visible = show
+  diaTxt.Visible = show
 end
 
--- Image functions
-function bgUpdate(bgx, fl)
+local function showNameBox(show)
+  nameboxFrm.Visible = show
+  nameTxt.Visible = show
+end
+
+-- ============================================================
+-- GLOBAL FUNCTIONS (called by chapter scripts)
+-- ============================================================
+
+-- These MUST be global - chapter scripts call them via loadstring
+
+function bgUpdate(bgx, forceload)
   if bgx == "club_day2" then
-    bgx = (math.random(1,6)==6) and "club-skill" or "club"
+    bgx = (math.random(1,6) == 6) and "club-skill" or "club"
   end
-  if xaload == 0 or fl then
-    local p = "assets/images/bg/"..bgx..".jpg"
-    local lp = getFile(p, true)
-    if lp then
-      local ok, id = pcall(getcustomasset, lp)
-      if ok and id then bgImg.Image = id; bgImg.Visible = true end
-    end
+  if env.xaload == 0 or forceload then
+    bgFade.BackgroundTransparency = 0
   end
-  bg1 = bgx
+  local id = env.loadImg("images/bg/" .. bgx .. ".jpg")
+  if id then
+    bgImg.Image = id; bgImg.Visible = true; bgLayer.Visible = true
+  else
+    bgImg.Visible = false
+  end
+  env.bg1 = bgx
 end
 
-function cgUpdate(cgx, fl)
-  if cg1 ~= cgx or fl then
-    local p = "assets/images/cg/"..cgx..".png"
-    local lp = getFile(p, true)
-    if lp then
-      local ok, id = pcall(getcustomasset, lp)
-      if ok and id then cgImg.Image = id; cgImg.Visible = true; cgLayer.Visible = true end
-    end
+function cgUpdate(cgx, forceload)
+  if env.cg1 ~= cgx or forceload then
+    local id = env.loadImg("images/cg/" .. cgx .. ".png")
+    if id then cgImg.Image = id; cgImg.Visible = true; cgLayer.Visible = true
+    else cgImg.Visible = false end
   end
-  cg1 = cgx
+  env.cg1 = cgx
 end
 
 function cgHide()
-  cgImg.Visible = false; cgLayer.Visible = false; cg1 = "blank"
+  cgUpdate("blank")
 end
 
--- Character functions
-local charMap = {s="sayori",n="natsuki",y="yuri",m="monika"}
-local lrT = {
-  ["1"]={"1l","1r"},["2"]={"1l","2r"},["3"]={"2l","1r"},["4"]={"2l","2r"},
-  ["1b"]={"1bl","1br"},["2b"]={"1bl","2br"},["3b"]={"2bl","1br"},["4b"]={"2bl","2br"},
-  ["5"]={"3",""},["5a"]={"3a",""},["5b"]={"3b",""},["5c"]={"3c",""},["5d"]={"3d",""}
-}
-
-function loadCharacter(set)
-  local chr
-  if set == s_Set then chr="sayori" elseif set == y_Set then chr="yuri"
-  elseif set == n_Set then chr="natsuki" elseif set == m_Set then chr="monika"
-  else return end
-  local lr = lrT[set.a] or {set.a,""}
-  local img = charImgs[chr]
-  if not img then return end
-  local p = "assets/images/"..chr.."/"..lr[1]..".png"
-  local lp = getFile(p, true)
-  if lp then
-    local ok, id = pcall(getcustomasset, lp)
-    if ok and id then img.Image = id; img.Visible = true end
+function audioUpdate(audiox, forceload)
+  if env.audio1 ~= audiox or forceload then
+    bgmSound:Stop()
+    if audiox ~= "" and audiox ~= "0" then
+      local id = env.loadAudio("audio/bgm/" .. audiox .. ".ogg")
+      if id then
+        bgmSound.SoundId = id; bgmSound.Looped = true; bgmSound:Play()
+      end
+    end
   end
+  env.audio1 = audiox
 end
 
-function loadSayori() loadCharacter(s_Set) end
-function loadYuri() loadCharacter(y_Set) end
-function loadNatsuki() loadCharacter(n_Set) end
-function loadMonika() loadCharacter(m_Set) end
-
-function hideAll()
-  s_Set = {a="",b="",x=-675,y=4}; y_Set = {a="",b="",x=-675,y=4}
-  n_Set = {a="",b="",x=-675,y=4}; m_Set = {a="",b="",x=-675,y=4}
-  for _, img in pairs(charImgs) do img.Visible = false; img.Image = "" end
+function sfxplay(sfxname)
+  local id = env.loadAudio("audio/sfx/" .. sfxname .. ".ogg")
+  if id then sfx1.SoundId = id; sfx1:Play() end
 end
-function hideSayori() charImgs["sayori"].Visible = false end
-function hideYuri() charImgs["yuri"].Visible = false end
-function hideNatsuki() charImgs["natsuki"].Visible = false end
-function hideMonika() charImgs["monika"].Visible = false end
-function loadAll() loadSayori(); loadNatsuki(); loadYuri(); loadMonika() end
-function unloadAll() hideAll() end
+
+function sfxplay2(sfx)
+  sfx:Play()
+end
+
+-- Character loading
+local charMap = {s="sayori",n="natsuki",y="yuri",m="monika"}
+
+function loadCharacterSprite(chr, a)
+  local cn = charMap[chr]
+  if not cn then return end
+  local fname = "1l.png"
+  if a == "1" or a == "" then fname = "1l.png"
+  elseif a == "1b" then fname = "1bl.png"
+  elseif a == "2" then fname = "1l.png"
+  elseif a == "2b" then fname = "1bl.png"
+  elseif a == "3" then fname = "2l.png"
+  elseif a == "3b" then fname = "2bl.png"
+  elseif a == "4" then fname = "2l.png"
+  elseif a == "4b" then fname = "2bl.png"
+  elseif a == "5" then fname = "3.png"
+  elseif a == "5a" then fname = "3a.png"
+  elseif a == "5b" then fname = "3b.png"
+  elseif a == "5c" then fname = "3c.png"
+  elseif a == "5d" then fname = "3d.png"
+  else fname = a .. ".png"
+  end
+  local id = env.loadImg("images/" .. cn .. "/" .. fname)
+  local img = charImgs[cn]
+  if id and img then img.Image = id; img.Visible = true end
+end
 
 function updateSayori(a, b, px)
-  s_Set.a = a; s_Set.b = b or ""
-  loadSayori()
+  loadCharacterSprite("s", a)
+  env.s_Set.a = a or ""; env.s_Set.b = b or ""
+  local ch = charImgs["sayori"]
+  if ch then ch.Position = UDim2.fromOffset(px or -60, 60) end
 end
+
 function updateYuri(a, b, px)
-  y_Set.a = a; y_Set.b = b or ""
-  loadYuri()
+  loadCharacterSprite("y", a)
+  env.y_Set.a = a or ""; env.y_Set.b = b or ""
+  local ch = charImgs["yuri"]
+  if ch then ch.Position = UDim2.fromOffset(px or 200, 60) end
 end
+
 function updateNatsuki(a, b, px)
-  n_Set.a = a; n_Set.b = b or ""
-  loadNatsuki()
+  loadCharacterSprite("n", a)
+  env.n_Set.a = a or ""; env.n_Set.b = b or ""
+  local ch = charImgs["natsuki"]
+  if ch then ch.Position = UDim2.fromOffset(px or 80, 60) end
 end
+
 function updateMonika(a, b, px)
-  m_Set.a = a; m_Set.b = b or ""
-  loadMonika()
+  loadCharacterSprite("m", a)
+  env.m_Set.a = a or ""; env.m_Set.b = b or ""
+  local ch = charImgs["monika"]
+  if ch then ch.Position = UDim2.fromOffset(px or 150, 60) end
 end
 
--- Text system
-function dripText(text, cps, sTime)
-  if text ~= last_text then
-    sTime = getTime; startTime = sTime; last_text = text; print_full_text = false
-  end
-  local cTime = getTime
-  if cTime <= sTime or sTime == 0 then return "" end
-  if not cps then cps = 100 end
-  local len = math.floor((cTime-sTime)*cps)
-  len = math.max(len,1); len = math.min(len,#text)
-  if print_full_text then return text end
-  if len == #text then print_full_text = true end
-  return text:sub(1,len)
+function hideSayori() if charImgs["sayori"] then charImgs["sayori"].Visible = false end end
+function hideYuri() if charImgs["yuri"] then charImgs["yuri"].Visible = false end end
+function hideNatsuki() if charImgs["natsuki"] then charImgs["natsuki"].Visible = false end end
+function hideMonika() if charImgs["monika"] then charImgs["monika"].Visible = false end end
+
+function hideAll()
+  for _, img in pairs(charImgs) do img.Visible = false end
+  env.s_Set = {a="",b="",x=-200,y=0}
+  env.y_Set = {a="",b="",x=-200,y=0}
+  env.n_Set = {a="",b="",x=-200,y=0}
+  env.m_Set = {a="",b="",x=-200,y=0}
 end
 
+-- Dialogue system
 function cw(p1, stext, tag)
-  local ct_text = ""
-  if p1 == "s" then ct_text = (tr.names and tr.names[1]) or "Sayori"
-  elseif p1 == "n" then ct_text = (tr.names and tr.names[2]) or "Natsuki"
-  elseif p1 == "y" then ct_text = (tr.names and tr.names[3]) or "Yuri"
-  elseif p1 == "m" then ct_text = (tr.names and tr.names[4]) or "Monika"
-  elseif p1 == "ny" then ct_text = (tr.names and tr.names[5]) or "Nat & Yuri"
-  elseif p1 == "mc" then ct_text = player
-  elseif p1 == "bl" then ct_text = ""
-  elseif p1 then ct_text = p1 else ct_text = "Error" end
+  if p1 == "s" then env.ct = tr.names[1]
+  elseif p1 == "n" then env.ct = tr.names[2]
+  elseif p1 == "y" then env.ct = tr.names[3]
+  elseif p1 == "m" then env.ct = tr.names[4]
+  elseif p1 == "ny" then env.ct = tr.names[5]
+  elseif p1 == "mc" then env.ct = env.player
+  elseif p1 == "bl" then env.ct = ""
+  else env.ct = p1 or "Error"
+  end
   if not stext then stext = "" end
-  if settings.lang == "eng" and p1 ~= "bl" then stext = "\u{201C}"..stext.."\u{201D}" end
+  if env.settings.lang == "eng" and p1 ~= "bl" then stext = '"' .. stext .. '"' end
+  env.c_disp[1] = stext
+  env.print_full_text = false; env.last_text = stext; env.startTime = env.getTime
 
-  if #history == 0 or history[1] ~= stext then
-    for i = 30, 1, -1 do history[i] = history[i-1] end
-    history[1] = (ct_text == "") and stext or (ct_text..": "..stext)
+  if env.ct and env.ct ~= "" then
+    nameTxt.Text = env.ct; showNameBox(true)
+  else
+    showNameBox(false)
   end
-
-  local tspd
-  if autoskip > 0 then tspd = 10000
-  elseif tag == "fast" or tag == "nwfast" then tspd = 250
-  elseif tag == "slow" then tspd = 25
-  elseif chapter == 30 then tspd = 50
-  else tspd = settings.textspd or 75 end
-
-  local textx = dripText(stext, tspd, startTime)
-  nameTxt.Text = ct_text; diaTxt.Text = textx
-  nameboxFrm.Visible = true; nameTxt.Visible = true
-  diaTxt.Visible = true; textboxBg.Visible = true
-  ctcImg.Visible = print_full_text
-
-  if tag and (tag == "nw" or tag == "nwfast") and print_full_text then
-    scriptJump(cl + 1)
-  elseif autotimer > 0 and print_full_text then
-    scriptJump(cl + 1); autotimer = 0.01
-  end
+  diaTxt.Text = stext; showTextBox(true)
 end
 
+-- Wrappers
 function bl(say) cw("bl", say) end
 function mc(say) cw("mc", say) end
 function s(say) cw("s", say) end
@@ -487,323 +447,436 @@ function n(say) cw("n", say) end
 function y(say) cw("y", say) end
 function m(say) cw("m", say) end
 
+-- Text utilities
+function wrap(str, limit)
+  local here = 1
+  local function check(sp, st, word, fi)
+    if fi - here > limit then here = st; return "\n" .. word end
+  end
+  return str:gsub("(%s+)()(%S+)()", check)
+end
+
+function glitchtext(range)
+  local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  local ret = ""
+  for i = 1, range do ret = ret .. chars:sub(math.random(1, #chars), math.random(1, #chars)) end
+  return ret
+end
+
+function space(range)
+  return string.rep(" ", range)
+end
+
 -- Script engine
 function scriptJump(nu, fu, au)
-  xaload = -1; unitimer = 0
-  if nu then cl = nu end
-  if au then autotimer = au; autoskip = au end
+  if nu then env.cl = nu end
+  env.xaload = -1; env.unitimer = 0
   if fu and fu ~= "" then
     local fn = _G[fu]
-    if fn then fn() else pcall(loadstring(fu.."()")) end
+    if fn then pcall(fn) end
+  end
+end
+
+function scriptCheck()
+  if not env.running then return end
+  local fn = _G["ch" .. env.chapter .. "script"]
+  if fn then
+    local ok, err = pcall(fn)
+    if not ok then print("[DDLC] Script error cl=" .. env.cl .. ": " .. tostring(err)) end
   end
 end
 
 function pause(t, f)
-  if f == "disable" then textbox_enabled = false end
-  autotimer = 0; print_full_text = false; ct = ""
+  env.autotimer = 0
+  if f == "disable" then env.textbox_enabled = false end
+  env.ct = ""
+  -- Will resume next frame
 end
 
 function choice_enable(x)
-  if not menu_enabled then
-    if x == "dialog" then menu_enable("dialog") else menu_enable("choice") end
-    autotimer = 0; autoskip = 0; ct = ""
+  if not env.menu_enabled then
+    print("[DDLC] Choice enabled: " .. tostring(x))
+    env.autotimer = 0; env.autoskip = 0; env.ct = ""
   end
 end
 
 function poeminitialize(y)
-  poemsread = 0; readpoem = {s=0,n=0,y=0,m=0}
-  if persistent.ptr == 0 then
-    choices = {tr.names[1],tr.names[2],tr.names[3],tr.names[4]}
-  elseif y == "y_ranaway" then choices = {tr.names[2],tr.names[4]}
-  else choices = {tr.names[2],tr.names[3],tr.names[4]} end
-  scriptJump(666,"",0)
+  env.poemsread = 0
+  env.readpoem = {s=0,n=0,y=0,m=0}
+  if env.persistent.ptr == 0 then
+    env.choices = {tr.names[1],tr.names[2],tr.names[3],tr.names[4]}
+  elseif y == "y_ranaway" then
+    env.choices = {tr.names[2],tr.names[4]}
+  else
+    env.choices = {tr.names[2],tr.names[3],tr.names[4]}
+  end
+  scriptJump(666, "", 0)
 end
 
-function glitchtext(r)
-  local c = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  local res = ""
-  for i = 1, r do res = res..c:sub(math.random(1,#c),math.random(1,#c)) end
-  return res
+function fadeOut(x)
+  env.alpha = math.max(env.alpha - 5, 0)
+  if env.alpha == 0 then
+    if x == 1 then
+      changeState("poemgame")
+    elseif x == 2 then
+      env.bg1 = "black"
+      changeState("game", 3)
+    elseif x == 3 then
+      env.chapter = env.chapter + 1
+      changeState("game", 3)
+    elseif x == 4 then
+      scriptJump(env.cl + 2)
+      env.alpha = 255
+    end
+  end
 end
 
-function scriptCheck()
-  local fn = _G["ch"..chapter.."script"]
-  if fn then local ok, err = pcall(fn); if not ok then print("[DDLC] Script err ch"..chapter..": "..tostring(err)) end end
-end
-
--- Event stubs
-function event_init(e, a1, a2) event_enabled = true end
-function event_initstart(e, a1, a2) event_init(e, a1, a2) end
-function event_start(e, a1, a2) end
+-- Event system stubs
+event_enabled = false
+function event_init(etype, arg1, arg2) end
+function event_initstart(etype, arg1, arg2) end
+function event_start(etype, arg1) end
 function event_draw() end
 function event_update() end
-function event_keypressed(k) end
-function event_endnext() cl = cl + 1; xaload = 0 end
-function event_end(a1) event_enabled = false; if a1 == "next" then event_endnext() end end
+function event_keypressed(key) end
+function event_end(arg1) end
 
--- Menu system
-local menu_previous = nil; local menu_previous2 = nil
-local menu_fadeout = false; local pagenum = 1; local keyboard = false
-local save_date = {}; local savenum = {}
+function changeState(cstate, x)
+  print("[DDLC] State: " .. tostring(cstate) .. " x=" .. tostring(x))
+  if cstate == "splash" then
+    env.state = "splash"; env.splashTimer = 0; env.alpha = 0
+    local id = env.loadImg("images/bg/splash.jpg")
+    if id then bgImg.Image = id; bgImg.Visible = true; bgLayer.Visible = true end
+    audioUpdate("1"); fadeImg.BackgroundTransparency = 1
 
-function menu_enable(m)
-  menu_enabled = true; menu_type = m
-  if m == "title" then menu_items = 6
-  elseif m == "pause" then menu_items = 9
-  elseif m == "choice" then menu_items = #choices + 1
-  elseif m == "settings" then menu_items = 8
-  elseif m == "savegame" or m == "loadgame" then menu_items = 8
-  elseif m == "characters" then menu_items = 6
-  elseif m == "help" or m == "history" then menu_items = 0
-  elseif m == "dialog" then menu_items = 2
-  elseif m == "mainyesno" or m == "quityesno" or m == "language" then menu_items = 3 end
-  m_selected = 2
-end
+  elseif cstate == "title" then
+    env.state = "title"; env.alpha = 0; env.poem_enabled = false
+    audioUpdate("1"); env.y_timer = 0; env.titlebg_ypos = -240
+    env.tlp = {yx=525,nx=670,sx=470,mx=680,yy=850,ny=850,sy=850,my=850,scale=0.75}
+    env.z_timer = {0,0}
+    showTitleMenu()
 
-function menu_confirm()
-  if menu_type == "title" then
-    menu_previous = "title"
-    if m_selected == 2 then
-      bg1 = "black"
-      if player ~= "" then changeState("game", 1)
-      else nameBox.Visible = true; nameBox:CaptureFocus() end
-    elseif m_selected == 3 then pagenum = 1; menu_enable("loadgame")
-    elseif m_selected == 4 then menu_enable("settings")
-    elseif m_selected == 5 then menu_enable("help")
-    elseif m_selected == 6 then menu_enable("quityesno") end
-  elseif menu_type == "pause" then
-    menu_previous = "pause"
-    if m_selected == 2 then menu_enable("history")
-    elseif m_selected == 3 then pagenum = 1; menu_enable("savegame")
-    elseif m_selected == 4 then pagenum = 1; menu_enable("loadgame")
-    elseif m_selected == 5 then
-      if persistent.chr.m == 2 then menu_fadeout = true else menu_enable("mainyesno") end
-    elseif m_selected == 6 then menu_enable("settings")
-    elseif m_selected == 7 then menu_enable("help")
-    elseif m_selected == 8 then menu_enable("quityesno")
-    elseif m_selected == 9 then menu_fadeout = true end
-  elseif menu_type == "choice" then
-    if choicepick ~= "" then scriptJump(cl+1); menu_fadeout = true end
-  elseif menu_type == "mainyesno" then
-    if m_selected == 2 then changeState("title") elseif m_selected == 3 then menu_enable("pause") end
-  elseif menu_type == "quityesno" then
-    if m_selected == 2 then env.stop() end
-  end
-end
-
-function menu_keypressed(key)
-  if key == "down" then
-    if menu_type == "savegame" or menu_type == "loadgame" then
-      if m_selected <= 4 then m_selected = m_selected + 3 else m_selected = m_selected - 3 end
-    elseif m_selected <= menu_items - 1 then m_selected = m_selected + 1 else m_selected = 2 end
-  elseif key == "up" then
-    if menu_type == "savegame" or menu_type == "loadgame" then
-      if m_selected >= 5 then m_selected = m_selected - 3 else m_selected = m_selected + 3 end
-    elseif m_selected >= 3 then m_selected = m_selected - 1 else m_selected = menu_items end
-  elseif key == "a" then
-    sfxplay("select"); menu_confirm()
-  elseif key == "b" then
-    sfxplay("hover")
-    if menu_type == "pause" then menu_fadeout = true
-    elseif menu_type ~= "title" and menu_type ~= "choice" and menu_type ~= "language" then
-      menu_enable(menu_previous)
+  elseif cstate == "game" then
+    hideTitleMenu(); env.state = "game"
+    if x == 1 then
+      env.cl = 1; env.chapter = env.persistent.ptr * 10
+    elseif x == 2 then
+      -- load game
+    elseif x == 3 then
+      env.cl = env.cl + 2
+    elseif x == "autoload" then
+      -- autoload
     end
-  end
-end
-
--- States
-function changeState(cs, x)
-  print("[DDLC] Loading state: "..cs)
-  menu_alpha = 0; menu_previous = nil; history = {}
-  if cs == "load" then
-    l_timer = 95; loadBar.Visible = true
-  elseif cs == "splash" then
-    local p = "assets/images/bg/splash.jpg"
-    local lp = getFile(p, true)
-    if lp then local _, id = pcall(getcustomasset, lp); if _ and id then bgImg.Image = id; bgImg.Visible = true end end
-    alpha = 0; audioUpdate("1"); s_timer = 0
-  elseif cs == "title" then
-    alpha = 0; audioUpdate("1")
-    menu_enable("title")
-    local p = "assets/images/gui/menu_bg.jpg"
-    local lp = getFile(p, true)
-    if lp then local _, id = pcall(getcustomasset, lp); if _ and id then bgImg.Image = id; bgImg.Visible = true end end
-    for _, b in pairs(titleBtns) do if b then b.Visible = true end end
-    hideAll()
-    charLayer.Visible = false; uiLayer.Visible = false; cgLayer.Visible = false
-  elseif cs == "game" and x == 1 then
-    cl = 1; chapter = persistent.ptr * 10
-    if persistent.ptr == 0 and persistent.chr.m == 0 then cl = 10001 end
-    loadChapterScript()
-  elseif cs == "game" and (x == 2 or x == 3) then
-    loadChapterScript()
-  elseif cs == "poemgame" then
-    alpha = 255
-  end
-  if cs == "game" or cs == "newgame" then
-    alpha = 255; loadAll()
-    bgUpdate(bg1, true); audioUpdate(audio1, true); cgUpdate(cg1, true)
-    poem_enabled = false; menu_enabled = false; xaload = -1
-    for _, b in pairs(titleBtns) do if b then b.Visible = false end end
-    -- Show UI layers
-    charLayer.Visible = true; uiLayer.Visible = true; cgLayer.Visible = true
+    env.hideAll(); env.xaload = -1
+    bgLayer.Visible = true; cgLayer.Visible = true
+    charLayer.Visible = true; uiLayer.Visible = true
     fadeLayer.Visible = true; fadeImg.BackgroundTransparency = 1
+    loadChapter(env.chapter)
+
+  elseif cstate == "poemgame" then
+    env.state = "poemgame"; env.hideAll()
+    audioUpdate("4", true); env.bg1 = "notebook"
+    startPoemGame()
+
+  elseif cstate == "credits" then
+    env.state = "credits"
+    audioUpdate("credits")
+    env.creditsTimer = 0
+
+  elseif cstate == "language" then
+    menu_type = "language"
+
+  elseif cstate == "s_kill_early" then
+    env.state = "s_kill_early"; env.alpha = 0
+    audioUpdate("s_kill_early"); env.y_timer = 0
+
+  elseif cstate == "ghostmenu" then
+    env.state = "ghostmenu"; env.alpha = 0
+    env.y_timer = 0.7; audioUpdate("ghostmenu")
+    env.tlp = {yx=525,nx=670,sx=470,mx=680,yy=850,ny=850,sy=850,my=850,scale=0.75}
+    env.z_timer = {0,0}
   end
-  state = cs
-  print("[DDLC] Loaded state: "..cs)
 end
 
-function loadChapterScript()
-  local code = readScript("scripts/eng/script-ch"..chapter..".lua")
+function loadChapter(ch)
+  env.chapter = ch; env.cl = 1
+  local code = env.loadScript("scripts/eng/script-ch" .. ch .. ".lua")
   if code then
-    local ok, err = pcall(loadstring(code))
-    if not ok then warn("[DDLC] Script load error ch"..chapter..": "..tostring(err)) end
-  end
-end
-
--- Loading
-function loadAssets()
-  print("[DDLC] Loading assets...")
-  getFile("assets/images/gui/menu_bg.jpg")
-  getFile("assets/images/gui/namebox.png")
-  getFile("assets/images/gui/textbox.png")
-  getFile("assets/images/gui/ctc.png")
-  getFile("assets/images/gui/overlay/main_menu.png")
-  getFile("assets/images/gui/overlay/game_menu.png")
-  getFile("assets/images/bg/splash.jpg")
-  getFile("assets/images/bg/black.jpg")
-  getFile("assets/audio/bgm/1.ogg")
-  getFile("assets/audio/sfx/select.ogg")
-  getFile("assets/audio/sfx/hover.ogg")
-  -- Preload chapter 0 script
-  readScript("scripts/eng/script-ch0.lua")
-  print("[DDLC] Asset loading complete")
-end
-
--- Draw/Update
-function drawSplash()
-  if state == "splash" then
-    bgLayer.Visible = true; bgImg.Visible = true
-    splashTxt.Visible = false; fadeImg.BackgroundTransparency = math.max(1 - alpha/255, 0)
-  elseif state == "splash2" then
-    bgLayer.Visible = true; splashTxt.Visible = true
-    splashTxt.Text = "This game is not suitable for children\n  or those who are easily disturbed."
-  elseif state == "title" then
-    for _, b in pairs(titleBtns) do b.Visible = true end
-    splashTxt.Visible = false
-  end
-end
-
-function updateSplash()
-  s_timer = s_timer + 0.016
-  if state == "splash" then
-    if s_timer <= 3 then alpha = math.min(alpha+7.75, 255)
-    else alpha = math.max(alpha-7.75, 0); if alpha <= 0 then state = "splash2"; s_timer = 0 end end
-  elseif state == "splash2" then
-    if s_timer <= 6 then alpha = math.min(alpha+7.75, 255)
-    elseif s_timer < 7 then alpha = math.max(alpha-7.75, 0)
-    elseif s_timer >= 7 then changeState("title") end
-  elseif state == "title" then
-    alpha = math.min(alpha+5, 255)
-  end
-end
-
-function updateGame()
-  scriptCheck()
-  xaload = xaload + 1
-  unitimer = math.min(unitimer + 0.016, uniduration)
-end
-
--- Input
-UserISvc.InputBegan:Connect(function(input, gpe)
-  if gpe then return end
-  local kc = input.KeyCode
-  local mapped
-  if kc == Enum.KeyCode.Space or kc == Enum.KeyCode.Return then mapped = "a"
-  elseif kc == Enum.KeyCode.Escape or kc == Enum.KeyCode.Backspace then mapped = "b"
-  elseif kc == Enum.KeyCode.LeftShift or kc == Enum.KeyCode.RightShift or kc == Enum.KeyCode.One then mapped = "y"
-  elseif kc == Enum.KeyCode.Two then mapped = "r"
-  elseif kc == Enum.KeyCode.Three then mapped = "start"
-  elseif kc == Enum.KeyCode.Four then mapped = "back"
-  elseif kc == Enum.KeyCode.Up then mapped = "up"
-  elseif kc == Enum.KeyCode.Down then mapped = "down"
-  elseif kc == Enum.KeyCode.Left then mapped = "left"
-  elseif kc == Enum.KeyCode.Right then mapped = "right" end
-  if not mapped then return end
-
-  if menu_enabled then menu_keypressed(mapped); return end
-  if state == "splash" or state == "splash2" then
-    if mapped == "a" then changeState("title") end
-  elseif state == "title" then
-    -- Handled by buttons
-  elseif state == "game" or state == "newgame" then
-    if event_enabled then
-      if mapped == "a" then event_endnext() end
-    elseif mapped == "a" then
-      if print_full_text then
-        autotimer = 0; cl = cl + 1; xaload = 0; unitimer = 0
-      else
-        print_full_text = true
-      end
-    elseif mapped == "y" then
-      autotimer = 0; menu_enable("pause")
-    elseif mapped == "start" then
-      if autotimer == 0 then autotimer = 0.01 else autotimer = 0 end
-    elseif mapped == "b" then
-      textbox_enabled = not textbox_enabled
+    local ok, err = loadstring(code)
+    if ok then
+      pcall(ok)
+    else
+      print("[DDLC] Script load error: " .. tostring(err))
     end
   end
-end)
+  task.wait()
+  scriptCheck()
+end
 
--- Main loop
-RunSvc.RenderStepped:Connect(function(dt)
-  getTime = getTime + dt
+-- ============================================================
+-- POEM GAME
+-- ============================================================
 
-  if state == "splash" or state == "splash2" or state == "title" then
-    updateSplash(); drawSplash()
-  elseif state == "game" or state == "newgame" then
-    updateGame()
+env.poemword = 1; env.poemstate = 0
+env.wordlist = {}; env.sPoint = 0; env.nPoint = 0; env.yPoint = 0
+env.poemMenuSel = 1
+
+function startPoemGame()
+  hideAll()
+  env.state = "poemgame"; env.xaload = 0
+  env.poemword = 1; env.sPoint = 0; env.nPoint = 0; env.yPoint = 0
+  env.poemstate = 0
+
+  local code = env.loadScript("scripts/eng/poemwords.lua")
+  if code then
+    local fn = loadstring(code)
+    if fn then pcall(fn) end
+    if poemwords then poemwords() end
+  end
+  env.wordlist = {}
+  if type(wordlist) == "table" then
+    for i = 1, math.min(10, #wordlist) do
+      local idx = math.random(1, #wordlist)
+      env.wordlist[i] = wordlist[idx]
+      table.remove(wordlist, idx)
+      if #wordlist == 0 then break end
+    end
+  end
+end
+
+function env.selectPoemWord()
+  if #env.wordlist == 0 then return end
+  local w = env.wordlist[env.poemMenuSel]
+  if w then
+    env.sPoint = env.sPoint + (w[2] or 0)
+    env.nPoint = env.nPoint + (w[3] or 0)
+    env.yPoint = env.yPoint + (w[4] or 0)
+    env.poemword = env.poemword + 1
+    table.remove(env.wordlist, env.poemMenuSel)
+    if #env.wordlist < 3 then
+      if type(wordlist) == "table" and #wordlist > 0 then
+        for i = 1, math.min(5, #wordlist) do
+          local idx = math.random(1, #wordlist)
+          table.insert(env.wordlist, wordlist[idx])
+          table.remove(wordlist, idx)
+          if #wordlist == 0 then break end
+        end
+      end
+    end
+    if env.poemword > 20 then
+      finishPoemGame()
+    end
+  end
+end
+
+function finishPoemGame()
+  -- Determine winner
+  if env.persistent.ptr <= 2 then
+    env.chapter = env.chapter + 1
+    local maxp = math.max(env.sPoint, env.nPoint, env.yPoint)
+    local pch = env.chapter
+    if env.persistent.ptr == 2 then pch = env.chapter - 20 end
+    if maxp == env.sPoint then env.poemwinner[pch] = "Sayori"
+    elseif maxp == env.nPoint then env.poemwinner[pch] = "Natsuki"
+    elseif maxp == env.yPoint then env.poemwinner[pch] = "Yuri"
+    end
+  end
+  changeState("game", 3)
+end
+
+-- ============================================================
+-- TITLE / MENU SYSTEM
+-- ============================================================
+
+function showTitleMenu()
+  menuLayer.Visible = true; env.state = "title"
+  env.menu_type = "title"
+  clearMenuItems()
+
+  -- Title art
+  local id = env.loadImg("images/gui/menu_bg.jpg")
+  if id then
+    local bg = newImg("MenuBg", nil, nil, menuLayer, 6)
+    bg.Image = id; bg.Visible = true
+    addMenuItem(bg)
+  end
+
+  local titleLabel = newTxt("TitleLabel", UDim2.fromScale(0.5,0.12), UDim2.fromOffset(800,80), menuLayer, 6)
+  titleLabel.Text = "DDLC-LOVE " .. VERSION
+  titleLabel.TextSize = 48; titleLabel.Font = Enum.Font.GothamBold
+  titleLabel.TextColor3 = Color3.fromRGB(255,200,100)
+  titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+  titleLabel.AnchorPoint = Vector2.new(0.5,0.5)
+  titleLabel.Visible = true; addMenuItem(titleLabel)
+
+  local btns = {{"NEW GAME",2},{"LOAD",3},{"SETTINGS",4},{"HELP",5},{"EXIT",6}}
+  for i, bd in ipairs(btns) do
+    local b = newBtn("B"..bd[1], UDim2.fromOffset(440,200+(i-1)*75),UDim2.fromOffset(400,60), bd[1], nil, nil, menuLayer, 6)
+    b.Visible = true; b.TextScaled = true
+    local sel = bd[2]
+    b.MouseButton1Click:Connect(function()
+      if sel == 2 then hideTitleMenu(); startGame()
+      elseif sel == 3 then print("[DDLC] Load")
+      elseif sel == 4 then print("[DDLC] Settings")
+      elseif sel == 5 then print("[DDLC] Help")
+      elseif sel == 6 then env.stop() end
+    end)
+    addMenuItem(b)
+  end
+  env.menu_alpha = 0
+end
+
+function hideTitleMenu()
+  menuLayer.Visible = false; clearMenuItems()
+end
+
+-- ============================================================
+-- GAME START
+-- ============================================================
+
+function startGame()
+  hideTitleMenu(); env.state = "game"
+  bgLayer.Visible = true; cgLayer.Visible = true
+  charLayer.Visible = true; uiLayer.Visible = true
+  fadeLayer.Visible = true; fadeImg.BackgroundTransparency = 1
+
+  env.cl = 1; env.chapter = 0; env.xaload = -1
+  env.hideAll(); bgUpdate("residential"); audioUpdate("2")
+  loadChapter(0)
+end
+
+-- ============================================================
+-- MAIN LOOP
+-- ============================================================
+
+rs.RenderStepped:Connect(function(dt)
+  if not env.running then return end
+
+  env.sectimer = env.sectimer + dt
+  env.getTime = env.getTime + dt
+  env.unitimer = env.unitimer + dt
+
+  -- Background fade
+  if bgFade.BackgroundTransparency < 1 then
+    bgFade.BackgroundTransparency = math.min(bgFade.BackgroundTransparency + dt * 3, 1)
+  end
+
+  -- State updates
+  if env.state == "splash" then
+    env.splashTimer = env.splashTimer + dt
+    if env.splashTimer > 1.5 then
+      env.alpha = math.min(env.alpha + dt * 150, 255)
+      if env.splashTimer > 3.5 then
+        env.splashTimer = 0; changeState("title")
+      end
+    end
+  end
+
+  if env.state == "title" then
+    env.alpha = math.min(env.alpha + dt * 80, 255)
+  end
+
+  if env.state == "game" and env.xaload >= 0 then
+    scriptCheck()
+  end
+
+  if env.state == "poemgame" then
+    env.xaload = env.xaload + 1
   end
 end)
 
--- Stop
-function env.stop()
-  bgmS:Stop(); bgmLpS:Stop()
-  local g = playerGui:FindFirstChild("DDLCGui")
-  if g then g:Destroy() end
-end
+-- ============================================================
+-- INPUT
+-- ============================================================
 
--- Auto-start
-print("[DDLC] DDLC-LOVE for Roblox starting...")
+uis.InputBegan:Connect(function(inp, gpe)
+  if gpe or not env.running then return end
 
-local textCode = readScript("scripts/eng/text.lua")
-if textCode then
-  local ok, err = pcall(loadstring(textCode))
-  if ok then print("[DDLC] Text loaded") else warn("[DDLC] Text error: "..tostring(err)) end
-end
+  if inp.KeyCode == Enum.KeyCode.Escape then
+    env.stop()
+  end
 
--- Download a few critical assets upfront, rest are on-demand
-task.spawn(function()
-  getFile("assets/images/gui/menu_bg.jpg", true)
-  getFile("assets/images/bg/black.jpg", true)
-  getFile("assets/images/bg/residential.jpg", true)
-  getFile("assets/images/bg/class.jpg", true)
-  getFile("assets/images/bg/club.jpg", true)
-  getFile("assets/images/bg/corridor.jpg", true)
-  getFile("assets/images/bg/house.jpg", true)
-  getFile("assets/images/bg/kitchen.jpg", true)
-  getFile("assets/images/bg/sayori_bedroom.jpg", true)
-  getFile("assets/images/bg/closet.jpg", true)
-  getFile("assets/audio/bgm/1.ogg", true)
-  getFile("assets/audio/bgm/1-loop.ogg", true)
-  getFile("assets/audio/bgm/2.ogg", true)
-  getFile("assets/audio/bgm/2-loop.ogg", true)
-  getFile("assets/audio/sfx/select.ogg", true)
-  getFile("assets/audio/sfx/hover.ogg", true)
-  readScript("scripts/eng/script-ch0.lua")
-  print("[DDLC] Background download complete")
+  local advance = (inp.KeyCode == Enum.KeyCode.Space or inp.KeyCode == Enum.KeyCode.Return)
+  if advance then
+    if env.state == "splash" then
+      changeState("title")
+    elseif env.state == "title" then
+      hideTitleMenu(); startGame()
+    elseif env.state == "game" then
+      env.cl = env.cl + 1; env.xaload = 0; env.unitimer = 0
+      env.print_full_text = false; scriptCheck()
+    elseif env.state == "poemgame" then
+      if env.poemstate == 0 then
+        env.poemstate = 1
+      else
+        env.selectPoemWord()
+      end
+    end
+  end
+
+  if inp.KeyCode == Enum.KeyCode.Up and env.state == "poemgame" then
+    env.poemMenuSel = math.max(1, env.poemMenuSel - 1)
+  end
+  if inp.KeyCode == Enum.KeyCode.Down and env.state == "poemgame" then
+    env.poemMenuSel = math.min(#env.wordlist, env.poemMenuSel + 1)
+  end
 end)
 
-state = "load"
-loadBar.Visible = true
-print("[DDLC] DDLC-LOVE Ready!")
+-- ============================================================
+-- PLAYER NAME INPUT
+-- ============================================================
+
+uis.TextBoxFocusReleased:Connect(function(tb)
+  if tb and tb.Text and tb.Text ~= "" then
+    env.player = tb.Text
+  end
+end)
+
+-- ============================================================
+-- STOP / CLEANUP
+-- ============================================================
+
+function env.stop()
+  env.running = false
+  bgmSound:Stop(); sfx1:Stop()
+  clearMenuItems()
+  for _, g in pairs(gui:GetChildren()) do
+    if g.Name:match("DDLC") then g:Destroy() end
+  end
+  print("[DDLC] Game stopped")
+end
+
+-- ============================================================
+-- AUTO START
+-- ============================================================
+
+task.spawn(function()
+  print("[DDLC] DDLC-LOVE " .. VERSION .. " loading...")
+
+  -- Pre-download essential assets
+  local essentials = {
+    "scripts/eng/script-ch0.lua",
+    "scripts/eng/script-ch1.lua",
+    "scripts/eng/script-ch2.lua",
+    "scripts/eng/poemwords.lua",
+    "images/bg/splash.jpg",
+    "images/gui/menu_bg.jpg",
+    "audio/bgm/1.ogg",
+    "audio/bgm/2.ogg",
+    "audio/bgm/3.ogg",
+    "audio/sfx/select.ogg",
+    "audio/sfx/hover.ogg"
+  }
+  for _, path in ipairs(essentials) do
+    env.loadScript(path)
+    env.loadImg(path)
+    task.wait(0.02)
+  end
+
+  loadingLabel.Visible = false
+  print("[DDLC] Starting game...")
+  task.wait(0.3)
+  changeState("splash")
+end)
+
+print("[DDLC] DDLC-LOVE loaded! Auto-starting...")
