@@ -764,15 +764,7 @@ RunSvc.RenderStepped:Connect(function(dt)
     if posX <= -200 then posX = 0 end; if posY <= -200 then posY = 0 end
   end
 
-  if state == "load" then
-    l_timer = l_timer + 1
-    loadBar.Size = UDim2.fromOffset(math.floor(256*(l_timer-95)/5), 10)
-    loadBar.Visible = true
-    if l_timer >= 99 then loadAssets() end
-    if l_timer >= 100 then
-      l_timer = 0; changeState("splash"); loadBar.Visible = false
-    end
-  elseif state == "splash" or state == "splash2" or state == "title" then
+  if state == "splash" or state == "splash2" or state == "title" then
     updateSplash(); drawSplash()
   elseif state == "game" or state == "newgame" then
     updateGame()
@@ -790,13 +782,85 @@ function env.stop()
   if g then g:Destroy() end
 end
 
--- Auto-start
+-- Auto-start - skip loading screen, go straight to Chapter 0
 print("[DDLC] DDLC-LOVE for Roblox starting...")
-local textCode = readScript("scripts/eng/text.lua")
-if textCode then
-  local ok, err = pcall(loadstring(textCode))
-  if ok then print("[DDLC] Text loaded") else warn("[DDLC] Text error: "..tostring(err)) end
+
+local function bootstrap()
+  -- Load text/localization
+  local textCode = readScript("scripts/eng/text.lua")
+  if textCode then
+    local ok, err = pcall(loadstring(textCode))
+    if ok then print("[DDLC] Text loaded") else warn("[DDLC] Text error: "..tostring(err)) end
+  end
+
+  -- Download essential assets in background
+  print("[DDLC] Downloading assets...")
+  getFile("assets/images/gui/menu_bg.jpg", true)
+  getFile("assets/images/bg/black.jpg", true)
+  getFile("assets/images/bg/residential.jpg", true)
+  getFile("assets/images/bg/class.jpg", true)
+  getFile("assets/images/bg/club.jpg", true)
+  getFile("assets/images/bg/corridor.jpg", true)
+  getFile("assets/images/bg/house.jpg", true)
+  getFile("assets/images/bg/kitchen.jpg", true)
+  getFile("assets/images/bg/sayori_bedroom.jpg", true)
+  getFile("assets/images/bg/closet.jpg", true)
+  getFile("assets/audio/bgm/1.ogg", true)
+  getFile("assets/audio/bgm/1-loop.ogg", true)
+  getFile("assets/audio/bgm/2.ogg", true)
+  getFile("assets/audio/bgm/2-loop.ogg", true)
+  getFile("assets/audio/sfx/select.ogg", true)
+  getFile("assets/audio/sfx/hover.ogg", true)
+  -- Sayori sprites for ch0
+  getFile("assets/images/sayori/1l.png", true)
+  getFile("assets/images/sayori/1r.png", true)
+  getFile("assets/images/sayori/2l.png", true)
+  getFile("assets/images/sayori/2r.png", true)
+  getFile("assets/images/sayori/3a.png", true)
+  getFile("assets/images/sayori/3b.png", true)
+  getFile("assets/images/sayori/3c.png", true)
+  getFile("assets/images/sayori/3d.png", true)
+  getFile("assets/images/sayori/4.png", true)
+  getFile("assets/images/sayori/a.png", true)
+  getFile("assets/images/sayori/b.png", true)
+  getFile("assets/images/sayori/c.png", true)
+  getFile("assets/images/sayori/d.png", true)
+  getFile("assets/images/sayori/e.png", true)
+  getFile("assets/images/sayori/f.png", true)
+  getFile("assets/images/sayori/g.png", true)
+  getFile("assets/images/sayori/h.png", true)
+  getFile("assets/images/sayori/i.png", true)
+  getFile("assets/images/sayori/j.png", true)
+  getFile("assets/images/sayori/k.png", true)
+  getFile("assets/images/sayori/l.png", true)
+  getFile("assets/images/sayori/m.png", true)
+  getFile("assets/images/sayori/n.png", true)
+  getFile("assets/images/sayori/o.png", true)
+  getFile("assets/images/sayori/p.png", true)
+  getFile("assets/images/sayori/q.png", true)
+  getFile("assets/images/sayori/r.png", true)
+  getFile("assets/images/sayori/s.png", true)
+  getFile("assets/images/sayori/t.png", true)
+  getFile("assets/images/sayori/u.png", true)
+  getFile("assets/images/sayori/v.png", true)
+  getFile("assets/images/sayori/w.png", true)
+  getFile("assets/images/sayori/x.png", true)
+  getFile("assets/images/sayori/y.png", true)
+  getFile("assets/images/sayori/1bl.png", true)
+  getFile("assets/images/sayori/1br.png", true)
+  getFile("assets/images/sayori/2bl.png", true)
+  getFile("assets/images/sayori/2br.png", true)
+  -- Pre-load chapter 0 script
+  readScript("scripts/eng/script-ch0.lua")
+  print("[DDLC] Assets ready, starting Chapter 0...")
+
+  -- Set up for new game
+  player = "Player"
+  persistent.ptr = 0; persistent.chr = {m = 1, s = 1}
+  bg1 = "black"; audio1 = "0"; cg1 = "blank"
+  loadBar.Visible = false
+  changeState("game", 1)
 end
-state = "load"
-loadBar.Visible = true
+
+task.spawn(bootstrap)
 print("[DDLC] DDLC-LOVE Ready!")
