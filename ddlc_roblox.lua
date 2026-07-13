@@ -496,7 +496,7 @@ local function syncGlobals()
   poemwinner = env.poemwinner; appeal = env.appeal
   poemsread = env.poemsread; readpoem = env.readpoem
   s_Set = env.s_Set; y_Set = env.y_Set; n_Set = env.n_Set; m_Set = env.m_Set
-  textbox_enabled = env.textbox_enabled; persistent = env.persistent; settings = env.settings
+  textbox_enabled = env.textbox_enabled; persistent = env.persistent; settings = env.settings; xaload = env.xaload
 end
 -- Sync globals back to env (chapter scripts may modify cl, chapter, etc.)
 local function syncFromGlobals()
@@ -659,43 +659,39 @@ function changeState(cstate, x)
   end
 end
 
--- Chapter script runner
--- Strategy A: compile original code + setfenv(fn, _G) so function defs
--- write directly to the real global table.
--- Strategy B: if setfenv unavailable, gsub "function name()" ->
--- "_G.name = function()" so the write goes through to _G directly.
-
 function execScript(relpath)
   local code = env.loadScript(relpath)
   if not code then
     debugTxt.Text = "ERR: script not found " .. relpath
     return
   end
-  -- Strategy A: try compiling original, set env to _G
   local fn, err = loadstring(code)
-  if fn then
-    if setfenv then
-      setfenv(fn, _G)
-    end
-    local ok2, pcerr = pcall(fn)
-    if ok2 then
-      debugTxt.Text = "exec " .. relpath .. " OK"
-    else
-      debugTxt.Text = "exec " .. relpath .. " ERR: " .. tostring(pcerr)
-    end
+  if not fn then
+    debugTxt.Text = "FAIL compile " .. relpath .. ": " .. tostring(err or "?")
     return
   end
-  -- Strategy B: gsub -> _G.name = function()
-  local modified = code:gsub("^(%s*)function%s+(%w+)%s*(%b())", function(spc, fname, args)
-    return spc .. "_G." .. fname .. " = function" .. args
-  end)
-  local fn2, err2 = loadstring(modified)
-  if fn2 then
-    pcall(fn2)
-    debugTxt.Text = "exec(gsub) " .. relpath .. " OK"
-  else
-    debugTxt.Text = "FAIL compile " .. relpath .. ": " .. tostring(err or err2 or "?")
+  local ok2, pcerr = pcall(fn)
+  if not ok2 then
+    debugTxt.Text = "ERR exec " .. relpath .. ": " .. tostring(pcerr)
+    return
   end
+  local env = getfenv and getfenv(fn)
+  local n = 0
+  if env then
+    for k, v in pairs(env) do
+      if type(v) == "function" and _G[k] ~= v then
+        _G[k] = v; n = n + 1
+      end
+    end
+    for _, k in ipairs({"cl","chapter","xaload","poemstate","warning_msg","menutext","choices","choicepick","poemwinner","appeal","alpha","wordlist"}) do
+      if env[k] ~= nil then _G[k] = env[k] end
+    end
+  else
+    for k, v in pairs(_G) do
+      if type(v) == "function" and k:match("^ch%d+script$") then n = n + 1 end
+    end
+  end
+  debugTxt.Text = "exec " .. relpath .. " (" .. n .. " fns, getfenv=" .. tostring(getfenv ~= nil) .. ")"
 end
 
 function loadChapter(ch)
