@@ -173,9 +173,11 @@ local bgFade = newFrm("BgFade", nil, nil, Color3.new(0,0,0), bgLayer, 1)
 bgFade.BackgroundTransparency = 1
 
 local cgLayer = newFrm("CgLayer", nil, nil, Color3.new(0,0,0), mainFrm, 2)
+cgLayer.BackgroundTransparency = 1
 local cgImg = newImg("CgImg", nil, nil, cgLayer, 2)
 
 local charLayer = newFrm("CharLayer", nil, nil, Color3.new(0,0,0), mainFrm, 3)
+charLayer.BackgroundTransparency = 1
 charLayer.Visible = true
 local charImgs = {}
 for _, nm in ipairs({"sayori","yuri","natsuki","monika"}) do
@@ -186,6 +188,7 @@ for _, nm in ipairs({"sayori","yuri","natsuki","monika"}) do
 end
 
 local uiLayer = newFrm("UiLayer", nil, nil, Color3.new(0,0,0), mainFrm, 4)
+uiLayer.BackgroundTransparency = 1
 uiLayer.Visible = true
 
 local fadeLayer = newFrm("FadeLayer", nil, nil, Color3.new(0,0,0), mainFrm, 5)
@@ -307,7 +310,9 @@ function bgUpdate(bgx, forceload)
   if id then
     bgImg.Image = id; bgImg.Visible = true; bgLayer.Visible = true
   else
-    bgImg.Visible = false
+    bgImg.Visible = true
+    bgImg.BackgroundColor3 = Color3.fromRGB(60, 90, 140)
+    bgImg.BackgroundTransparency = 0
   end
   env.bg1 = bgx
 end
@@ -567,14 +572,14 @@ function changeState(cstate, x)
     elseif x == "autoload" then
       -- autoload
     end
-    env.hideAll(); env.xaload = -1
+    hideAll(); env.xaload = -1
     bgLayer.Visible = true; cgLayer.Visible = true
     charLayer.Visible = true; uiLayer.Visible = true
     fadeLayer.Visible = true; fadeImg.BackgroundTransparency = 1
     loadChapter(env.chapter)
 
   elseif cstate == "poemgame" then
-    env.state = "poemgame"; env.hideAll()
+    env.state = "poemgame"; hideAll()
     audioUpdate("4", true); env.bg1 = "notebook"
     startPoemGame()
 
@@ -739,9 +744,10 @@ function startGame()
   bgLayer.Visible = true; cgLayer.Visible = true
   charLayer.Visible = true; uiLayer.Visible = true
   fadeLayer.Visible = true; fadeImg.BackgroundTransparency = 1
+  textboxBg.Visible = true; diaTxt.Visible = true
 
   env.cl = 1; env.chapter = 0; env.xaload = -1
-  env.hideAll(); bgUpdate("residential"); audioUpdate("2")
+  hideAll(); bgUpdate("residential"); audioUpdate("2")
   loadChapter(0)
 end
 
@@ -854,11 +860,14 @@ task.spawn(function()
   print("[DDLC] DDLC-LOVE " .. VERSION .. " loading...")
 
   -- Pre-download essential assets
-  local essentials = {
+  local essScripts = {
     "scripts/eng/script-ch0.lua",
     "scripts/eng/script-ch1.lua",
     "scripts/eng/script-ch2.lua",
     "scripts/eng/poemwords.lua",
+    "scripts/eng/text.lua"
+  }
+  local essImages = {
     "images/bg/splash.jpg",
     "images/gui/menu_bg.jpg",
     "audio/bgm/1.ogg",
@@ -867,8 +876,11 @@ task.spawn(function()
     "audio/sfx/select.ogg",
     "audio/sfx/hover.ogg"
   }
-  for _, path in ipairs(essentials) do
+  for _, path in ipairs(essScripts) do
     env.loadScript(path)
+    task.wait(0.02)
+  end
+  for _, path in ipairs(essImages) do
     env.loadImg(path)
     task.wait(0.02)
   end
