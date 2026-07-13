@@ -473,8 +473,31 @@ function space(range)
 end
 
 -- Script engine
+-- Sync env vars to globals (chapter scripts read globals)
+local function syncGlobals()
+  cl = env.cl; chapter = env.chapter; bg1 = env.bg1
+  audio1 = env.audio1; cg1 = env.cg1; ct = env.ct
+  player = env.player; choices = env.choices; choicepick = env.choicepick
+  poemwinner = env.poemwinner; appeal = env.appeal
+  poemsread = env.poemsread; readpoem = env.readpoem
+  s_Set = env.s_Set; y_Set = env.y_Set; n_Set = env.n_Set; m_Set = env.m_Set
+  textbox_enabled = env.textbox_enabled; persistent = env.persistent; settings = env.settings
+end
+-- Sync globals back to env (chapter scripts may modify cl, chapter, etc.)
+local function syncFromGlobals()
+  env.cl = cl; env.chapter = chapter; env.bg1 = bg1
+  env.audio1 = audio1; env.cg1 = cg1; env.ct = ct
+  env.player = player; env.choices = choices; env.choicepick = choicepick
+  env.poemwinner = poemwinner; env.appeal = appeal
+  env.poemsread = poemsread; env.readpoem = readpoem
+  env.s_Set = s_Set; env.y_Set = y_Set; env.n_Set = n_Set; env.m_Set = m_Set
+  env.textbox_enabled = textbox_enabled; env.persistent = persistent; env.settings = settings
+end
+-- Initialize globals from env
+syncGlobals()
+
 function scriptJump(nu, fu, au)
-  if nu then env.cl = nu end
+  if nu then env.cl = nu; cl = nu end
   env.xaload = -1; env.unitimer = 0
   if fu and fu ~= "" then
     local fn = _G[fu]
@@ -484,11 +507,13 @@ end
 
 function scriptCheck()
   if not env.running then return end
-  local fn = _G["ch" .. env.chapter .. "script"]
+  syncGlobals()
+  local fn = _G["ch" .. chapter .. "script"]
   if fn then
     local ok, err = pcall(fn)
-    if not ok then print("[DDLC] Script error cl=" .. env.cl .. ": " .. tostring(err)) end
+    if not ok then print("[DDLC] Script error cl=" .. tostring(cl) .. ": " .. tostring(err)) end
   end
+  syncFromGlobals()
 end
 
 function pause(t, f)
