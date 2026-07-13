@@ -192,8 +192,9 @@ uiLayer.BackgroundTransparency = 1
 uiLayer.Visible = true
 
 local fadeLayer = newFrm("FadeLayer", nil, nil, Color3.new(0,0,0), mainFrm, 5)
+fadeLayer.BackgroundTransparency = 1
 local fadeImg = newImg("FadeImg", nil, nil, fadeLayer, 5)
-fadeImg.BackgroundColor3 = Color3.new(0,0,0); fadeImg.BackgroundTransparency = 0
+fadeImg.BackgroundColor3 = Color3.new(0,0,0); fadeImg.BackgroundTransparency = 1
 
 local menuLayer = newFrm("MenuLayer", nil, nil, Color3.new(0,0,0), mainFrm, 6)
 
