@@ -516,18 +516,39 @@ function scriptJump(nu, fu, au)
   env.xaload = -1; env.unitimer = 0
   if fu and fu ~= "" then
     local fn = _G[fu]
-    if fn then pcall(fn) end
+    if fn then pcall(fn); syncSandboxGlobals(fn) end
+  end
+end
+
+-- Sync writable globals from sandbox back to _G after a script call
+-- Strategy A: getfenv (reads sandbox env directly)
+-- Strategy B: __sandbox_bridge__ table shared via __index
+_G.__sandbox_bridge__ = {}
+local function syncSandboxGlobals(fn)
+  if not fn then return end
+  if getfenv then
+    local senv = getfenv(fn)
+    if senv then
+      for _, k in ipairs({"cl","chapter","player","poemstate","warning_msg","menutext","choices","choicepick","poemwinner","appeal","alpha","wordlist"}) do
+        if senv[k] ~= nil then _G[k] = senv[k] end
+      end
+      return
+    end
+  end
+  -- Fallback: read from __sandbox_bridge__ (set by script sync code)
+  for k, v in pairs(_G.__sandbox_bridge__) do
+    _G[k] = v
+    _G.__sandbox_bridge__[k] = nil
   end
 end
 
 function scriptCheck()
   if not env.running then return end
   syncGlobals()
-  local fnName = "ch" .. tostring(chapter) .. "script"
-  local fn = _G[fnName]
-  debugTxt.Text = "scriptCheck: chapter=" .. tostring(chapter) .. " cl=" .. tostring(cl) .. " fn=" .. tostring(fnName) .. " found=" .. tostring(fn ~= nil)
+  local fn = _G["ch" .. chapter .. "script"]
   if fn then
     local ok, err = pcall(fn)
+    syncSandboxGlobals(fn)
     if not ok then
       print("[DDLC] Script error cl=" .. tostring(cl) .. ": " .. tostring(err))
       debugTxt.Text = "ERROR: " .. tostring(err)
@@ -648,29 +669,37 @@ function changeState(cstate, x)
   end
 end
 
-function loadChapter(ch)
-  env.chapter = ch; env.cl = 1
-  local code = env.loadScript("scripts/eng/script-ch" .. ch .. ".lua")
-  if code then
-    local fnName = "ch" .. ch .. "script"
-    local ok, compiled = loadstring(code)
-    if compiled then
-      if setfenv then setfenv(compiled, getfenv()) end
-      local s, err = pcall(compiled)
-      if not s then print("[DDLC] Script exec error: " .. tostring(err)) end
-    end
-    if not _G[fnName] then
-      local mod = code:gsub("^function%s+" .. fnName .. "%s*%b()", "_G['" .. fnName .. "'] = function()")
-      local ok2, compiled2 = loadstring(mod)
-      if compiled2 then
-        if setfenv then setfenv(compiled2, getfenv()) end
-        pcall(compiled2)
+-- Chapter script runner
+-- loadstring creates an isolated sandbox. The sandbox CAN read globals from
+-- _G via __index, but writes go to its private env. So we redirect all
+-- "function name()" declarations to "__scriptFns__['name'] = function()".
+-- __scriptFns__ itself is read from _G (shared), so writes to the TABLE
+-- land in our global table. Then we copy them to _G.
+_G.__scriptFns__ = {}
+
+-- Execute a script file, returning all functions defined in it
+function execScript(relpath)
+  local code = env.loadScript(relpath)
+  if not code then return end
+  local modified = code:gsub("^(%s*)function%s+(%w+)%s*%b()", function(spc, fname)
+    return spc .. "__scriptFns__['" .. fname .. "'] = function"
+  end)
+  local ok, compiled = loadstring(modified)
+  if compiled then
+    pcall(compiled)
+    local n = 0
+    for name, fn in pairs(_G.__scriptFns__) do
+      if type(fn) == "function" and _G[name] ~= fn then
+        _G[name] = fn; n = n + 1
       end
     end
-    if not _G[fnName] then
-      print("[DDLC] Failed to compile " .. fnName)
-    end
+    debugTxt.Text = "execScript " .. relpath .. " (" .. n .. " fns) getfenv=" .. tostring(getfenv ~= nil)
   end
+end
+
+function loadChapter(ch)
+  env.chapter = ch; env.cl = 1
+  execScript("scripts/eng/script-ch" .. ch .. ".lua")
   task.wait()
   scriptCheck()
 end
@@ -689,11 +718,11 @@ function startPoemGame()
   env.poemword = 1; env.sPoint = 0; env.nPoint = 0; env.yPoint = 0
   env.poemstate = 0
 
-  local code = env.loadScript("scripts/eng/poemwords.lua")
-  if code then
-    local fn = loadstring(code)
-    if fn then pcall(fn) end
-    if poemwords then poemwords() end
+  execScript("scripts/eng/poemwords.lua")
+  if poemwords then
+    local fn = poemwords
+    pcall(fn)
+    syncSandboxGlobals(fn)
   end
   env.wordlist = {}
   if type(wordlist) == "table" then
