@@ -198,6 +198,15 @@ fadeImg.BackgroundColor3 = Color3.new(0,0,0); fadeImg.BackgroundTransparency = 1
 
 local menuLayer = newFrm("MenuLayer", nil, nil, Color3.new(0,0,0), mainFrm, 6)
 
+-- DEBUG OVERLAY
+local debugTxt = newTxt("DebugTxt", UDim2.fromOffset(10,10), UDim2.fromOffset(600,200), mainFrm)
+debugTxt.TextSize = 14; debugTxt.TextColor3 = Color3.fromRGB(0,255,0)
+debugTxt.TextXAlignment = Enum.TextXAlignment.Left
+debugTxt.TextYAlignment = Enum.TextYAlignment.Top
+debugTxt.BackgroundTransparency = 0.5
+debugTxt.BackgroundColor3 = Color3.new(0,0,0)
+debugTxt.Visible = true; debugTxt.ZIndex = 10
+
 -- LOADING
 local loadingLabel = newTxt("LoadingLabel", UDim2.fromOffset(0,300), UDim2.fromOffset(1280,100), mainFrm)
 loadingLabel.Text = "DDLC-LOVE Loading..."
@@ -210,9 +219,11 @@ local textboxBg = newFrm("TextBoxBg", UDim2.fromOffset(0,560), UDim2.fromOffset(
 textboxBg.BackgroundTransparency = 0.2
 local nameboxFrm = newFrm("NameBox", UDim2.fromOffset(40,520), UDim2.fromOffset(260,36), Color3.fromRGB(186,84,153), uiLayer)
 local nameTxt = newTxt("NameTxt", UDim2.fromOffset(10,4), UDim2.fromOffset(240,28), nameboxFrm)
-nameTxt.TextSize = 20; nameTxt.Font = Enum.Font.GothamBold
+nameTxt.TextSize = 20; nameTxt.Font = Enum.Font.GothamBold; nameTxt.TextColor3 = Color3.new(1,1,1)
+local diaBg = newFrm("DiaBg", UDim2.fromOffset(40,575), UDim2.fromOffset(1200,140), Color3.new(0,0,0), uiLayer)
+diaBg.BackgroundTransparency = 0.5
 local diaTxt = newTxt("DiaTxt", UDim2.fromOffset(50,580), UDim2.fromOffset(1180,130), uiLayer)
-diaTxt.TextSize = 19; diaTxt.TextWrapped = true; diaTxt.RichText = true
+diaTxt.TextSize = 19; diaTxt.TextWrapped = true; diaTxt.TextColor3 = Color3.new(1,1,1)
 
 -- AUDIO
 local bgmSound = Instance.new("Sound"); bgmSound.Name="DDLCBGM"
@@ -286,6 +297,7 @@ end
 
 local function showTextBox(show)
   textboxBg.Visible = show
+  diaBg.Visible = show
   diaTxt.Visible = show
 end
 
@@ -443,6 +455,8 @@ function cw(p1, stext, tag)
     showNameBox(false)
   end
   diaTxt.Text = stext; showTextBox(true)
+  diaTxt.Visible = true; textboxBg.Visible = true; diaBg.Visible = true
+  debugTxt.Text = "cw called: p1=" .. tostring(p1) .. " stext=" .. tostring(stext) .. " | cl=" .. tostring(cl)
 end
 
 -- Wrappers
@@ -509,10 +523,15 @@ end
 function scriptCheck()
   if not env.running then return end
   syncGlobals()
-  local fn = _G["ch" .. chapter .. "script"]
+  local fnName = "ch" .. tostring(chapter) .. "script"
+  local fn = _G[fnName]
+  debugTxt.Text = "scriptCheck: chapter=" .. tostring(chapter) .. " cl=" .. tostring(cl) .. " fn=" .. tostring(fnName) .. " found=" .. tostring(fn ~= nil)
   if fn then
     local ok, err = pcall(fn)
-    if not ok then print("[DDLC] Script error cl=" .. tostring(cl) .. ": " .. tostring(err)) end
+    if not ok then
+      print("[DDLC] Script error cl=" .. tostring(cl) .. ": " .. tostring(err))
+      debugTxt.Text = "ERROR: " .. tostring(err)
+    end
   end
   syncFromGlobals()
 end
@@ -770,7 +789,7 @@ function startGame()
   bgLayer.Visible = true; cgLayer.Visible = true
   charLayer.Visible = true; uiLayer.Visible = true
   fadeLayer.Visible = true; fadeImg.BackgroundTransparency = 1
-  textboxBg.Visible = true; diaTxt.Visible = true
+  textboxBg.Visible = true; diaTxt.Visible = true; diaBg.Visible = true; nameTxt.Visible = true
 
   env.cl = 1; env.chapter = 0; env.xaload = -1
   hideAll(); bgUpdate("residential"); audioUpdate("2")
