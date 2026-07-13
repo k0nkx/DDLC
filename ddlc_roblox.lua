@@ -179,12 +179,17 @@ local cgImg = newImg("CgImg", nil, nil, cgLayer, 2)
 local charLayer = newFrm("CharLayer", nil, nil, Color3.new(0,0,0), mainFrm, 3)
 charLayer.BackgroundTransparency = 1
 charLayer.Visible = true
+local function newCharImg(n)
+  local c = {name=n}
+  c.left = newImg(n.."_L", UDim2.fromOffset(0,60), UDim2.fromOffset(500,600), charLayer, 3)
+  c.left.ResampleMode = Enum.ResamplerMode.Pixelated
+  c.right = newImg(n.."_R", UDim2.fromOffset(0,60), UDim2.fromOffset(500,600), charLayer, 3)
+  c.right.ResampleMode = Enum.ResamplerMode.Pixelated
+  return c
+end
 local charImgs = {}
 for _, nm in ipairs({"sayori","yuri","natsuki","monika"}) do
-  local ci = newImg(nm, UDim2.fromOffset(0,60), UDim2.fromOffset(500,600), charLayer, 3)
-  ci.SizeConstraint = Enum.SizeConstraint.RelativeXX
-  ci.ResampleMode = Enum.ResamplerMode.Pixelated
-  charImgs[nm] = ci
+  charImgs[nm] = newCharImg(nm)
 end
 
 local uiLayer = newFrm("UiLayer", nil, nil, Color3.new(0,0,0), mainFrm, 4)
@@ -224,6 +229,17 @@ local diaBg = newFrm("DiaBg", UDim2.fromOffset(40,575), UDim2.fromOffset(1200,14
 diaBg.BackgroundTransparency = 0.5
 local diaTxt = newTxt("DiaTxt", UDim2.fromOffset(50,580), UDim2.fromOffset(1180,130), uiLayer)
 diaTxt.TextSize = 19; diaTxt.TextWrapped = true; diaTxt.TextColor3 = Color3.new(1,1,1)
+
+-- CLICK TO ADVANCE
+local clickBtn = Instance.new("TextButton")
+clickBtn.Name = "ClickAdvance"
+clickBtn.BackgroundTransparency = 1
+clickBtn.BorderSizePixel = 0
+clickBtn.Position = UDim2.fromOffset(0, 520)
+clickBtn.Size = UDim2.fromOffset(1280, 200)
+clickBtn.Text = ""
+clickBtn.ZIndex = 7
+clickBtn.Parent = uiLayer
 
 -- AUDIO
 local bgmSound = Instance.new("Sound"); bgmSound.Name="DDLCBGM"
@@ -366,67 +382,87 @@ function sfxplay2(sfx)
 end
 
 -- Character loading
+-- Mapping from original loader/characters.lua loadCharacter()
 local charMap = {s="sayori",n="natsuki",y="yuri",m="monika"}
+local function charLR(chr, a)
+  local lr = {"",""}
+  if a == "1" then lr = {"1l","1r"}
+  elseif a == "2" then lr = {"1l","2r"}
+  elseif a == "3" and chr ~= "y" then lr = {"2l","1r"}
+  elseif (a == "3" and chr == "y") or (a == "4" and chr ~= "y") then lr = {"2l","2r"}
+  elseif a == "1b" then lr = {"1bl","1br"}
+  elseif a == "2b" then lr = {"1bl","2br"}
+  elseif a == "3b" and chr ~= "y" then lr = {"2bl","1br"}
+  elseif (a == "3b" and chr == "y") or (a == "4b" and chr ~= "y") then lr = {"2bl","2br"}
+  elseif (a == "4" and chr == "y") or a == "5" then lr = {"3",""}
+  elseif a == "5a" then lr = {"3a",""}
+  elseif (a == "4b" and chr == "y") or a == "5b" then lr = {"3b",""}
+  elseif a == "5c" then lr = {"3c",""}
+  elseif a == "5d" then lr = {"3d",""}
+  elseif a then lr = {a,""}
+  end
+  return lr
+end
 
 function loadCharacterSprite(chr, a)
   local cn = charMap[chr]
   if not cn then return end
-  local fname = "1l.png"
-  if a == "1" or a == "" then fname = "1l.png"
-  elseif a == "1b" then fname = "1bl.png"
-  elseif a == "2" then fname = "1l.png"
-  elseif a == "2b" then fname = "1bl.png"
-  elseif a == "3" then fname = "2l.png"
-  elseif a == "3b" then fname = "2bl.png"
-  elseif a == "4" then fname = "2l.png"
-  elseif a == "4b" then fname = "2bl.png"
-  elseif a == "5" then fname = "3.png"
-  elseif a == "5a" then fname = "3a.png"
-  elseif a == "5b" then fname = "3b.png"
-  elseif a == "5c" then fname = "3c.png"
-  elseif a == "5d" then fname = "3d.png"
-  else fname = a .. ".png"
-  end
-  local id = env.loadImg("images/" .. cn .. "/" .. fname)
+  local lr = charLR(chr, a)
   local img = charImgs[cn]
-  if id and img then img.Image = id; img.Visible = true end
+  if not img then return end
+  if lr[1] ~= "" then
+    local id = env.loadImg("images/" .. cn .. "/" .. lr[1] .. ".png")
+    img.left.Image = id or ""; img.left.Visible = id ~= nil
+  else
+    img.left.Visible = false
+  end
+  if lr[2] ~= "" then
+    local id = env.loadImg("images/" .. cn .. "/" .. lr[2] .. ".png")
+    img.right.Image = id or ""; img.right.Visible = id ~= nil
+  else
+    img.right.Visible = false
+  end
+end
+
+local function setCharPos(n, px)
+  local c = charImgs[n]
+  if not c then return end
+  local x = px or 0
+  c.left.Position = UDim2.fromOffset(x, 60)
+  c.right.Position = UDim2.fromOffset(x + 250, 60)
 end
 
 function updateSayori(a, b, px)
   loadCharacterSprite("s", a)
   env.s_Set.a = a or ""; env.s_Set.b = b or ""
-  local ch = charImgs["sayori"]
-  if ch then ch.Position = UDim2.fromOffset(px or -60, 60) end
+  setCharPos("sayori", px or -60)
 end
 
 function updateYuri(a, b, px)
   loadCharacterSprite("y", a)
   env.y_Set.a = a or ""; env.y_Set.b = b or ""
-  local ch = charImgs["yuri"]
-  if ch then ch.Position = UDim2.fromOffset(px or 200, 60) end
+  setCharPos("yuri", px or 200)
 end
 
 function updateNatsuki(a, b, px)
   loadCharacterSprite("n", a)
   env.n_Set.a = a or ""; env.n_Set.b = b or ""
-  local ch = charImgs["natsuki"]
-  if ch then ch.Position = UDim2.fromOffset(px or 80, 60) end
+  setCharPos("natsuki", px or 80)
 end
 
 function updateMonika(a, b, px)
   loadCharacterSprite("m", a)
   env.m_Set.a = a or ""; env.m_Set.b = b or ""
-  local ch = charImgs["monika"]
-  if ch then ch.Position = UDim2.fromOffset(px or 150, 60) end
+  setCharPos("monika", px or 150)
 end
 
-function hideSayori() if charImgs["sayori"] then charImgs["sayori"].Visible = false end end
-function hideYuri() if charImgs["yuri"] then charImgs["yuri"].Visible = false end end
-function hideNatsuki() if charImgs["natsuki"] then charImgs["natsuki"].Visible = false end end
-function hideMonika() if charImgs["monika"] then charImgs["monika"].Visible = false end end
+function hideSayori() local c=charImgs["sayori"]; if c then c.left.Visible=false; c.right.Visible=false end end
+function hideYuri() local c=charImgs["yuri"]; if c then c.left.Visible=false; c.right.Visible=false end end
+function hideNatsuki() local c=charImgs["natsuki"]; if c then c.left.Visible=false; c.right.Visible=false end end
+function hideMonika() local c=charImgs["monika"]; if c then c.left.Visible=false; c.right.Visible=false end end
 
 function hideAll()
-  for _, img in pairs(charImgs) do img.Visible = false end
+  for _, c in pairs(charImgs) do c.left.Visible = false; c.right.Visible = false end
   env.s_Set = {a="",b="",x=-200,y=0}
   env.y_Set = {a="",b="",x=-200,y=0}
   env.n_Set = {a="",b="",x=-200,y=0}
@@ -909,31 +945,29 @@ end)
 -- INPUT
 -- ============================================================
 
-uis.InputBegan:Connect(function(inp, gpe)
-  if gpe or not env.running then return end
-
-  if inp.KeyCode == Enum.KeyCode.Escape then
-    env.stop()
-  end
-
-  local advance = (inp.KeyCode == Enum.KeyCode.Space or inp.KeyCode == Enum.KeyCode.Return)
-  if advance then
-    if env.state == "splash" then
-      changeState("title")
-    elseif env.state == "title" then
-      hideTitleMenu(); startGame()
-    elseif env.state == "game" then
-      env.cl = env.cl + 1; env.xaload = 0; env.unitimer = 0
-      env.print_full_text = false; scriptCheck()
-    elseif env.state == "poemgame" then
-      if env.poemstate == 0 then
-        env.poemstate = 1
-      else
-        env.selectPoemWord()
-      end
+local function doAdvance()
+  if env.state == "splash" then
+    changeState("title")
+  elseif env.state == "title" then
+    hideTitleMenu(); startGame()
+  elseif env.state == "game" then
+    env.cl = env.cl + 1; env.xaload = 0; env.unitimer = 0
+    env.print_full_text = false; scriptCheck()
+  elseif env.state == "poemgame" then
+    if env.poemstate == 0 then
+      env.poemstate = 1
+    else
+      env.selectPoemWord()
     end
   end
+end
 
+uis.InputBegan:Connect(function(inp, gpe)
+  if gpe or not env.running then return end
+  if inp.KeyCode == Enum.KeyCode.Escape then env.stop() end
+  if inp.KeyCode == Enum.KeyCode.Space or inp.KeyCode == Enum.KeyCode.Return then
+    doAdvance()
+  end
   if inp.KeyCode == Enum.KeyCode.Up and env.state == "poemgame" then
     env.poemMenuSel = math.max(1, env.poemMenuSel - 1)
   end
@@ -941,6 +975,8 @@ uis.InputBegan:Connect(function(inp, gpe)
     env.poemMenuSel = math.min(#env.wordlist, env.poemMenuSel + 1)
   end
 end)
+
+clickBtn.MouseButton1Click:Connect(doAdvance)
 
 -- ============================================================
 -- PLAYER NAME INPUT
