@@ -652,11 +652,23 @@ function loadChapter(ch)
   env.chapter = ch; env.cl = 1
   local code = env.loadScript("scripts/eng/script-ch" .. ch .. ".lua")
   if code then
-    local ok, err = loadstring(code)
-    if ok then
-      pcall(ok)
-    else
-      print("[DDLC] Script load error: " .. tostring(err))
+    local fnName = "ch" .. ch .. "script"
+    local ok, compiled = loadstring(code)
+    if compiled then
+      if setfenv then setfenv(compiled, getfenv()) end
+      local s, err = pcall(compiled)
+      if not s then print("[DDLC] Script exec error: " .. tostring(err)) end
+    end
+    if not _G[fnName] then
+      local mod = code:gsub("^function%s+" .. fnName .. "%s*%b()", "_G['" .. fnName .. "'] = function()")
+      local ok2, compiled2 = loadstring(mod)
+      if compiled2 then
+        if setfenv then setfenv(compiled2, getfenv()) end
+        pcall(compiled2)
+      end
+    end
+    if not _G[fnName] then
+      print("[DDLC] Failed to compile " .. fnName)
     end
   end
   task.wait()
